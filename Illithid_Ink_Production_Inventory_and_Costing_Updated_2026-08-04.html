@@ -1,0 +1,2540 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1" name="viewport"/>
+<title>Illithid Ink — Production Inventory & Costing</title>
+<style>
+    :root{--bg:#0b0c10;--panel:#111318;--muted:#8a91a5;--text:#e8ecf1;--chip:#1a1e27;--border:#1f2430}
+    html,body{height:100%} body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Inter,Helvetica,Arial,sans-serif;background:#0b0c10;color:var(--text)}
+    header{position:sticky;top:0;z-index:10;background:#111318;border-bottom:1px solid var(--border)}
+    .container{max-width:1280px;margin:0 auto;padding:16px}
+    .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+    .brand{font-weight:700}
+    .search{flex:1;min-width:240px}
+    .search input{width:100%;padding:10px 12px;border-radius:12px;border:1px solid var(--border);background:#0f1218;color:var(--text);outline:none}
+    .control{display:flex;gap:8px;align-items:center;background:#111318;padding:8px 10px;border-radius:12px;border:1px solid var(--border)}
+    .control label{font-size:12px;color:var(--muted)}
+    select{background:#0f1218;color:var(--text);border:1px solid var(--border);border-radius:10px;padding:8px;min-width:160px}
+    .toolbar{display:flex;justify-content:space-between;align-items:center;margin:12px 0;gap:12px;flex-wrap:wrap}
+    .count{font-size:12px;color:var(--muted)}
+    .kpis{display:flex;gap:10px;flex-wrap:wrap;color:var(--muted);font-size:12px;margin:6px 0 12px}
+    .kpis span{background:#0f1218;border:1px solid var(--border);border-radius:8px;padding:6px 8px}
+    .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;padding-bottom:24px}
+    .card{background:#111318;border:1px solid var(--border);border-radius:16px;overflow:hidden;position:relative}
+    .card.discontinued{opacity:.5}
+    .card.do-not-use{border-color:rgba(239,68,68,.75);box-shadow:0 0 0 1px rgba(239,68,68,.18),0 12px 28px rgba(120,0,0,.18)}
+    .imgwrap{aspect-ratio:4/3;background:#0d1117;display:flex;align-items:center;justify-content:center;color:#5b6a77}
+    .imgwrap img{max-width:100%;max-height:100%;object-fit:contain}
+    .card-body{padding:12px}
+    .name{font-weight:00;font-size:15px;line-height:1.25;margin:0 0 6px}
+    .meta{font-size:12px;color:var(--muted)}
+    .chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+    .chip{font-size:11px;padding:4px 8px;background:var(--chip);border:1px solid var(--border);border-radius:999px;color:#cfeff}
+    .chip.discontinued{background:#3a1212;border-color:#aa3333;color:#ff9999}
+    .chip.unverified{background:#3a2b12;border-color:#c2953a;color:#ffeb3}
+    .chip.stain-pass{background:#12331f;border-color:#3aa4a;color:#b9ffd1}
+    .chip.stain-fail{background:#3a1212;border-color:#cc4444;color:#ffb3b3;font-weight:800}
+    .chip.stain-retest{background:#3a2d12;border-color:#cc8844;color:#ffd1a3}
+    .chip.stain-caution{background:#3a2d12;border-color:#d6a63f;color:#ffe4a3;font-weight:700}
+    .chip.no-use{background:#5b1010;border-color:#ff5a5a;color:#ffd6d6;font-weight:900;letter-spacing:.04em;text-transform:uppercase}
+
+    .chip.la-safe{background:#193b1e;border-color:#2c7743;color:#9dffb3}
+    .chip.la-unsafe{background:#3a1212;border-color:#aa3333;color:#ff9999}
+    
+    .price{margin-top:8px;font-size:13px}
+    .btn{cursor:pointer;display:inline-flex;gap:8px;align-items:center;background:#111826;border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:10px}
+    .btn:hover{border-color:#2b3444}
+    #toTop {
+  display: none;              /* Hidden by default */
+  position: fixed;            /* Fixed position */
+  bottom: 20px;
+  right: 20px;
+  z-index: 99;                /* Make sure it stays on top */
+  font-size: 14px;
+  border: 1px solid var(--border);
+  outline: none;
+  background-color: #111826;
+  color: var(--text);
+  cursor: pointer;
+  padding: 10px 14px;
+  border-radius: 10px;
+}
+#toTop:hover {
+  border-color: #2b3444;
+}
+  
+    /* --- Vendor grouping --- */
+    .imgwrap{position:relative;overflow:hidden}
+    .flag{position:absolute;top:10px;right:10px;padding:6px 10px;border-radius:999px;font-size:12px;line-height:1;border:1px solid var(--border);background:rgba(255,255,255,.06);backdrop-filter: blur(6px)}
+    .flag.use-blocked{left:10px;right:auto;border-color:#ff5a5a;background:rgba(91,16,16,.85);color:#fff;font-weight:900;letter-spacing:.04em}
+    .group-header{grid-column:1/-1;display:flex;align-items:center;gap:10px;margin:14px 0 2px;padding:10px 12px;border:1px solid var(--border);border-radius:14px;background:rgba(255,255,255,.03)}
+    .group-header .vendor{font-weight:700;letter-spacing:.2px}
+    .group-header .count{color:var(--muted);font-size:13px}
+
+
+    .docs{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+    .docchip{font-size:11px;padding:4px 8px;background:var(--chip);border:1px solid var(--border);border-radius:999px;color:#cfe7ff;text-decoration:none;display:inline-block}
+    .docchip:hover{border-color:var(--accent)}
+    .docchip.disabled{opacity:.45;pointer-events:none}
+    .note-line{font-size:12px;margin-top:8px;padding:8px 10px;border-radius:10px;background:rgba(255,255,255,.035);border:1px solid var(--border);line-height:1.35}
+    .note-line.danger{background:rgba(239,68,68,.10);border-color:rgba(239,68,68,.40);color:#ffd2d2}
+
+  </style>
+</head>
+<body>
+<header>
+<div class="container row">
+<div class="brand">Illithid Ink · Production Inventory & Costing</div>
+<div class="search"><input id="q" placeholder="Search name, vendor, notes, order ID…" type="search"/></div>
+<div class="control">
+<label for="vendor">Vendor</label>
+<select id="vendor"><option value="">All vendors</option></select>
+</div>
+<div class="control">
+<label for="category">Category</label>
+<select id="category"><option value="">All categories</option></select>
+</div>
+<div class="control">
+<label for="finish">Finish</label>
+<select id="finish"><option value="">All finishes</option></select>
+</div>
+<div class="control">
+<label for="color">Color</label>
+<select id="color"><option value="">All colors</option></select>
+</div>
+<div class="control">
+<label for="la_safe">LA Safety</label>
+<select id="la_safe">
+<option value="">All safety statuses</option>
+<option value="safe">LA Safe only</option>
+<option value="unsafe">Not LA Safe</option>
+</select>
+</div>
+<div class="control">
+<label for="stain_test">Stain Test</label>
+<select id="stain_test">
+<option value="">All stain statuses</option>
+<option value="passed">Passed</option>
+<option value="failed">Failed</option>
+<option value="caution">Use with caution</option>
+<option value="needs_retest">Needs retest</option>
+<option value="untested">Untested</option>
+</select>
+</div>
+<div class="control">
+<label for="use_status">Use Status</label>
+<select id="use_status">
+<option value="">All use statuses</option>
+<option value="usable">Usable / not blocked</option>
+<option value="do_not_use">Do not use</option>
+</select>
+</div>
+<div class="control">
+<label for="sort">Sort</label>
+<select id="sort">
+<option value="vendor_name">Vendor (grouped) → Name (A→Z)</option>
+<option value="name">Name (A→Z)</option>
+<option value="cpgram_asc">Cost/gram (low→high)</option>
+<option value="cpgram_desc">Cost/gram (high→low)</option>
+<option value="cpunit_asc">Cost/unit (low→high)</option>
+<option value="cpunit_desc">Cost/unit (high→low)</option>
+<option value="date_desc">Newest first</option>
+<option value="date_asc">Oldest first</option>
+</select>
+</div>
+<button class="btn" id="clear">Clear filters</button>
+</div>
+</header>
+<main class="container">
+<div class="toolbar"><div class="count" id="count">0 items</div></div>
+<div class="kpis">
+<span id="kpi_total_items">Total items: 0</span>
+<span id="kpi_total_cost">Total spend: $0.00</span>
+<span id="kpi_total_weight">Total weight: 0 g</span>
+<span id="kpi_avg_cpg">Avg $/g: $0.00</span>
+<span id="kpi_count_based">Count-based items: 0</span>
+<span id="kpi_do_not_use">Do not use: 0</span>
+</div>
+<div aria-live="polite" class="grid" id="grid"></div>
+</main>
+<script>
+var HALF_OZ_G = 14.17475;
+window.__INV__ = [
+  {
+    "id": "CT-GA-7510",
+    "name": "GA-7510 Hydrophilic Ultramarine Blue",
+    "vendor": "Color Techniques",
+    "category": "Pigment",
+    "finish": "Matte",
+    "color": "Blue",
+    "particle_size_microns": "",
+    "solvent_safe": null,
+    "weight_g": 10000,
+    "volume_ml": null,
+    "price_usd": 493.8,
+    "order_id": "II-CT-001",
+    "order_date": "2026-07-20",
+    "location": "",
+    "notes": "10 kg repack at $49.38/kg. Product cost $493.80. Shipping was not listed on the uploaded PO and is not included yet.",
+    "image_url": "",
+    "msds_url": "",
+    "coa_url": "",
+    "la_safe": true,
+    "verification_status": "verified",
+    "discontinued": null,
+    "moq_g": null,
+    "stain_test_result": "untested",
+    "stain_test_notes": "",
+    "do_not_use": false,
+    "use_restriction": "",
+    "item_total_usd": 493.8,
+    "allocated_shipping_duties_usd": 0,
+    "price_basis": "10 kg"
+  },
+  {
+    "id": "CT-GA-7540",
+    "name": "GA-7540 Hydrophilic Ultramarine Violet",
+    "vendor": "Color Techniques",
+    "category": "Pigment",
+    "finish": "Matte",
+    "color": "Violet",
+    "particle_size_microns": "",
+    "solvent_safe": null,
+    "weight_g": 10000,
+    "volume_ml": null,
+    "price_usd": 582.5,
+    "order_id": "II-CT-001",
+    "order_date": "2026-07-20",
+    "location": "",
+    "notes": "10 kg repack at $58.25/kg. Product cost $582.50. Shipping was not listed on the uploaded PO and is not included yet.",
+    "image_url": "",
+    "msds_url": "",
+    "coa_url": "",
+    "la_safe": true,
+    "verification_status": "verified",
+    "discontinued": null,
+    "moq_g": null,
+    "stain_test_result": "untested",
+    "stain_test_notes": "",
+    "do_not_use": false,
+    "use_restriction": "",
+    "item_total_usd": 582.5,
+    "allocated_shipping_duties_usd": 0,
+    "price_basis": "10 kg"
+  },
+  {
+    "id": "DAYGLO-DGP-20-PL2G",
+    "name": "DGP-20-PL2G",
+    "vendor": "DayGlo",
+    "category": "Glow Pigment",
+    "finish": "Glow-in-the-dark",
+    "color": "",
+    "particle_size_microns": "20 µm",
+    "solvent_safe": null,
+    "weight_g": 2267.96185,
+    "volume_ml": null,
+    "price_usd": 385.0,
+    "order_id": "II-DG-001",
+    "order_date": "2026-07-17",
+    "location": "",
+    "notes": "5 lb production-size purchase at $77/lb, product cost $385.00. Shipping was not listed and is not included yet. The identical 5 lb / $385 line also appears on PO II-SM-001, so it is counted once here to avoid duplicating the same inventory.",
+    "image_url": "",
+    "msds_url": "",
+    "coa_url": "",
+    "la_safe": false,
+    "verification_status": "verified",
+    "discontinued": null,
+    "moq_g": null,
+    "stain_test_result": "untested",
+    "stain_test_notes": "",
+    "do_not_use": false,
+    "use_restriction": "",
+    "item_total_usd": 385.0,
+    "allocated_shipping_duties_usd": 0,
+    "price_basis": "5 lb"
+  },
+  {
+    "id": "KOBO-GLW45GYSP",
+    "name": "GLW45GYSP",
+    "vendor": "Kobo Products Inc.",
+    "category": "Pigment Dispersion",
+    "finish": "",
+    "color": "",
+    "particle_size_microns": "",
+    "solvent_safe": null,
+    "weight_g": 1000,
+    "volume_ml": null,
+    "price_usd": 46.91,
+    "order_id": "II-KOBO-001",
+    "order_date": "2026-06-30",
+    "location": "",
+    "notes": "1 kg production-size purchase. Product cost $24.80. Includes an assumed $22.11 FedEx charge for this package, based on treating each box in the four-piece shipment as separately billed.",
+    "image_url": "",
+    "msds_url": "",
+    "coa_url": "",
+    "la_safe": true,
+    "verification_status": "verified",
+    "discontinued": null,
+    "moq_g": null,
+    "stain_test_result": "untested",
+    "stain_test_notes": "",
+    "do_not_use": false,
+    "use_restriction": "",
+    "item_total_usd": 24.8,
+    "allocated_shipping_duties_usd": 22.11,
+    "price_basis": "1 kg",
+    "shipping_usd": 22.11,
+    "fees_usd": 0,
+    "duties_usd": 0
+  },
+  {
+    "id": "KOBO-GLW55GRSP",
+    "name": "GLW55GRSP",
+    "vendor": "Kobo Products Inc.",
+    "category": "Pigment Dispersion",
+    "finish": "",
+    "color": "",
+    "particle_size_microns": "",
+    "solvent_safe": null,
+    "weight_g": 1000,
+    "volume_ml": null,
+    "price_usd": 52.67,
+    "order_id": "II-KOBO-001",
+    "order_date": "2026-06-30",
+    "location": "",
+    "notes": "1 kg production-size purchase. Product cost $30.56. Includes an assumed $22.11 FedEx charge for this package, based on treating each box in the four-piece shipment as separately billed.",
+    "image_url": "",
+    "msds_url": "",
+    "coa_url": "",
+    "la_safe": true,
+    "verification_status": "verified",
+    "discontinued": null,
+    "moq_g": null,
+    "stain_test_result": "untested",
+    "stain_test_notes": "",
+    "do_not_use": false,
+    "use_restriction": "",
+    "item_total_usd": 30.56,
+    "allocated_shipping_duties_usd": 22.11,
+    "price_basis": "1 kg",
+    "shipping_usd": 22.11,
+    "fees_usd": 0,
+    "duties_usd": 0
+  },
+  {
+    "id": "KOBO-GLW60GBSP",
+    "name": "GLW60GBSP",
+    "vendor": "Kobo Products Inc.",
+    "category": "Pigment Dispersion",
+    "finish": "",
+    "color": "",
+    "particle_size_microns": "",
+    "solvent_safe": null,
+    "weight_g": 1000,
+    "volume_ml": null,
+    "price_usd": 53.46,
+    "order_id": "II-KOBO-001",
+    "order_date": "2026-06-30",
+    "location": "",
+    "notes": "1 kg production-size purchase. Product cost $31.35. Includes an assumed $22.11 FedEx charge for this package, based on treating each box in the four-piece shipment as separately billed.",
+    "image_url": "",
+    "msds_url": "",
+    "coa_url": "",
+    "la_safe": true,
+    "verification_status": "verified",
+    "discontinued": null,
+    "moq_g": null,
+    "stain_test_result": "untested",
+    "stain_test_notes": "",
+    "do_not_use": false,
+    "use_restriction": "",
+    "item_total_usd": 31.35,
+    "allocated_shipping_duties_usd": 22.11,
+    "price_basis": "1 kg",
+    "shipping_usd": 22.11,
+    "fees_usd": 0,
+    "duties_usd": 0
+  },
+  {
+    "id": "KOBO-GLW75PFSP",
+    "name": "GLW75PFSP",
+    "vendor": "Kobo Products Inc.",
+    "category": "Pigment Dispersion",
+    "finish": "",
+    "color": "",
+    "particle_size_microns": "",
+    "solvent_safe": null,
+    "weight_g": 1000,
+    "volume_ml": null,
+    "price_usd": 42.21,
+    "order_id": "II-KOBO-001",
+    "order_date": "2026-06-30",
+    "location": "",
+    "notes": "1 kg production-size purchase. Product cost $20.10. Includes an assumed $22.11 FedEx charge for this package, based on treating each box in the four-piece shipment as separately billed.",
+    "image_url": "",
+    "msds_url": "",
+    "coa_url": "",
+    "la_safe": true,
+    "verification_status": "verified",
+    "discontinued": null,
+    "moq_g": null,
+    "stain_test_result": "untested",
+    "stain_test_notes": "",
+    "do_not_use": false,
+    "use_restriction": "",
+    "item_total_usd": 20.1,
+    "allocated_shipping_duties_usd": 22.11,
+    "price_basis": "1 kg",
+    "shipping_usd": 22.11,
+    "fees_usd": 0,
+    "duties_usd": 0
+  },
+  {
+    "id": "KOLORTEK-SR-05",
+    "name": "SR-05 Red",
+    "vendor": "Kolortek Co., Ltd.",
+    "category": "Pigment",
+    "finish": "",
+    "color": "Red",
+    "particle_size_microns": "5–55 µm",
+    "solvent_safe": null,
+    "weight_g": 1000,
+    "volume_ml": null,
+    "price_usd": 229.84493510526315,
+    "order_id": "KTP260624811050933",
+    "order_date": "2026-07-16",
+    "location": "",
+    "notes": "1 kg production-size purchase at $125.50/kg. Product line cost $125.50. Includes proportional allocation of the uploaded invoice's $280 shipping and $35 handling fee ($9.61 allocated to this item). Includes a conservative estimated duty allocation of $94.736842 (one nineteenth of $1,800).",
+    "image_url": "",
+    "msds_url": "",
+    "coa_url": "",
+    "la_safe": true,
+    "verification_status": "verified",
+    "discontinued": null,
+    "moq_g": null,
+    "stain_test_result": "untested",
+    "stain_test_notes": "",
+    "do_not_use": false,
+    "use_restriction": "",
+    "item_total_usd": 125.5,
+    "allocated_shipping_duties_usd": 104.34493510526316,
+    "price_basis": "1 kg",
+    "estimated_duty_usd": 94.73684210526316,
+    "duties_usd": 94.73684210526316,
+    "pricing_status": "estimated duty"
+  },
+  {
+    "id": "KOLORTEK-8210",
+    "name": "8210 Bright White",
+    "vendor": "Kolortek Co., Ltd.",
+    "category": "Effect Pigment",
+    "finish": "",
+    "color": "White",
+    "particle_size_microns": "10–60 µm",
+    "solvent_safe": null,
+    "weight_g": 1000,
+    "volume_ml": null,
+    "price_usd": 208.31376510526314,
+    "order_id": "KTP260624811050933",
+    "order_date": "2026-07-16",
+    "location": "",
+    "notes": "1 kg production-size purchase at $105.50/kg. Product line cost $105.50. Includes proportional allocation of the uploaded invoice's $280 shipping and $35 handling fee ($8.08 allocated to this item). Includes a conservative estimated duty allocation of $94.736842 (one nineteenth of $1,800).",
+    "image_url": "",
+    "msds_url": "",
+    "coa_url": "",
+    "la_safe": true,
+    "verification_status": "verified",
+    "discontinued": null,
+    "moq_g": null,
+    "stain_test_result": "untested",
+    "stain_test_notes": "",
+    "do_not_use": false,
+    "use_restriction": "",
+    "item_total_usd": 105.5,
+    "allocated_shipping_duties_usd": 102.81376510526316,
+    "price_basis": "1 kg",
+    "estimated_duty_usd": 94.73684210526316,
+    "duties_usd": 94.73684210526316,
+    "pricing_status": "estimated duty"
+  },
+  {
+    "id": "KOLORTEK-8212",
+    "name": "8212 Bright Red",
+    "vendor": "Kolortek Co., Ltd.",
+    "category": "Effect Pigment",
+    "finish": "",
+    "color": "Red",
+    "particle_size_microns": "10–60 µm",
+    "solvent_safe": null,
+    "weight_g": 1000,
+    "volume_ml": null,
+    "price_usd": 208.31376510526314,
+    "order_id": "KTP260624811050933",
+    "order_date": "2026-07-16",
+    "location": "",
+    "notes": "1 kg production-size purchase at $105.50/kg. Product line cost $105.50. Includes proportional allocation of the uploaded invoice's $280 shipping and $35 handling fee ($8.08 allocated to this item). Includes a conservative estimated duty allocation of $94.736842 (one nineteenth of $1,800).",
+    "image_url": "",
+    "msds_url": "",
+    "coa_url": "",
+    "la_safe": true,
+    "verification_status": "verified",
+    "discontinued": null,
+    "moq_g": null,
+    "stain_test_result": "untested",
+    "stain_test_notes": "",
+    "do_not_use": false,
+    "use_restriction": "",
+    "item_total_usd": 105.5,
+    "allocated_shipping_duties_usd": 102.81376510526316,
+    "price_basis": "1 kg",
+    "estimated_duty_usd": 94.73684210526316,
+    "duties_usd": 94.73684210526316,
+    "pricing_status": "estimated duty"
+  },
+  {
+    "id": "KOLORTEK-8213",
+    "name": "8213 Bright Violet",
+    "vendor": "Kolortek Co., Ltd.",
+    "category": "Effect Pigment",
+    "finish": "",
+    "color": "Violet",
+    "particle_size_microns": "10–60 µm",
+    "solvent_safe": null,
+    "weight_g": 1000,
+    "volume_ml": null,
+    "price_usd": 208.31376510526314,
+    "order_id": "KTP260624811050933",
+    "order_date": "2026-07-16",
+    "location": "",
+    "notes": "1 kg production-size purchase at $105.50/kg. Product line cost $105.50. Includes proportional allocation of the uploaded invoice's $280 shipping and $35 handling fee ($8.08 allocated to this item). Includes a conservative estimated duty allocation of $94.736842 (one nineteenth of $1,800).",
+    "image_url": "",
+    "msds_url": "",
+    "coa_url": "",
+    "la_safe": true,
+    "verification_status": "verified",
+    "discontinued": null,
+    "moq_g": null,
+    "stain_test_result": "untested",
+    "stain_test_notes": "",
+    "do_not_use": false,
+    "use_restriction": "",
+    "item_total_usd": 105.5,
+    "allocated_shipping_duties_usd": 102.81376510526316,
+    "price_basis": "1 kg",
+    "estimated_duty_usd": 94.73684210526316,
+    "duties_usd": 94.73684210526316,
+    "pricing_status": "estimated duty"
+  },
+  {
+    "id": "KOLORTEK-8214",
+    "name": "8214 Bright Blue",
+    "vendor": "Kolortek Co., Ltd.",
+    "category": "Effect Pigment",
+    "finish": "",
+    "color": "Blue",
+    "particle_size_microns": "10–60 µm",
+    "solvent_safe": null,
+    "weight_g": 1000,
+    "volume_ml": null,
+    "price_usd": 208.31376510526314,
+    "order_id": "KTP260624811050933",
+    "order_date": "2026-07-16",
+    "location": "",
+    "notes": "1 kg production-size purchase at $105.50/kg. Product line cost $105.50. Includes proportional allocation of the uploaded invoice's $280 shipping and $35 handling fee ($8.08 allocated to this item). Includes a conservative estimated duty allocation of $94.736842 (one nineteenth of $1,800).",
+    "image_url": "",
+    "msds_url": "",
+    "coa_url": "",
+    "la_safe": true,
+    "verification_status": "verified",
+    "discontinued": null,
+    "moq_g": null,
+    "stain_test_result": "untested",
+    "stain_test_notes": "",
+    "do_not_use": false,
+    "use_restriction": "",
+    "item_total_usd": 105.5,
+    "allocated_shipping_duties_usd": 102.81376510526316,
+    "price_basis": "1 kg",
+    "estimated_duty_usd": 94.73684210526316,
+    "duties_usd": 94.73684210526316,
+    "pricing_status": "estimated duty"
+  },
+  {
+    "id": "KOLORTEK-8215",
+    "name": "8215 Bright Green",
+    "vendor": "Kolortek Co., Ltd.",
+    "category": "Effect Pigment",
+    "finish": "",
+    "color": "Green",
+    "particle_size_microns": "10–60 µm",
+    "solvent_safe": null,
+    "weight_g": 1000,
+    "volume_ml": null,
+    "price_usd": 208.31376510526314,
+    "order_id": "KTP260624811050933",
+    "order_date": "2026-07-16",
+    "location": "",
+    "notes": "1 kg production-size purchase at $105.50/kg. Product line cost $105.50. Includes proportional allocation of the uploaded invoice's $280 shipping and $35 handling fee ($8.08 allocated to this item). Includes a conservative estimated duty allocation of $94.736842 (one nineteenth of $1,800).",
+    "image_url": "",
+    "msds_url": "",
+    "coa_url": "",
+    "la_safe": true,
+    "verification_status": "verified",
+    "discontinued": null,
+    "moq_g": null,
+    "stain_test_result": "untested",
+    "stain_test_notes": "",
+    "do_not_use": false,
+    "use_restriction": "",
+    "item_total_usd": 105.5,
+    "allocated_shipping_duties_usd": 102.81376510526316,
+    "price_basis": "1 kg",
+    "estimated_duty_usd": 94.73684210526316,
+    "duties_usd": 94.73684210526316,
+    "pricing_status": "estimated duty"
+  },
+  {
+    "id": "KOLORTEK-68860371",
+    "name": "68860371 Sparkle Orange",
+    "vendor": "Kolortek Co., Ltd.",
+    "category": "Effect Pigment",
+    "finish": "",
+    "color": "Orange",
+    "particle_size_microns": "60–300 µm",
+    "solvent_safe": null,
+    "weight_g": 1000,
+    "volume_ml": null,
+    "price_usd": 208.31376510526314,
+    "order_id": "KTP260624811050933",
+    "order_date": "2026-07-16",
+    "location": "",
+    "notes": "1 kg production-size purchase at $105.50/kg. Product line cost $105.50. Includes proportional allocation of the uploaded invoice's $280 shipping and $35 handling fee ($8.08 allocated to this item). Includes a conservative estimated duty allocation of $94.736842 (one nineteenth of $1,800).",
+    "image_url": "",
+    "msds_url": "",
+    "coa_url": "",
+    "la_safe": false,
+    "verification_status": "verified",
+    "discontinued": null,
+    "moq_g": null,
+    "stain_test_result": "untested",
+    "stain_test_notes": "",
+    "do_not_use": false,
+    "use_restriction": "",
+    "item_total_usd": 105.5,
+    "allocated_shipping_duties_usd": 102.81376510526316,
+    "price_basis": "1 kg",
+    "estimated_duty_usd": 94.73684210526316,
+    "duties_usd": 94.73684210526316,
+    "pricing_status": "estimated duty"
+  },
+  {
+    "id": "KOLORTEK-92802",
+    "name": "92802 Violet/Red/Orange/Yellow Green",
+    "vendor": "Kolortek Co., Ltd.",
+    "category": "Effect Pigment",
+    "finish": "Color Shift",
+    "color": "Multicolor",
+    "particle_size_microns": "5–25 µm",
+    "solvent_safe": null,
+    "weight_g": 1000,
+    "volume_ml": null,
+    "price_usd": 326.7352011052632,
+    "order_id": "KTP260624811050933",
+    "order_date": "2026-07-16",
+    "location": "",
+    "notes": "1 kg production-size purchase at $215.50/kg. Product line cost $215.50. Includes proportional allocation of the uploaded invoice's $280 shipping and $35 handling fee ($16.50 allocated to this item). Includes a conservative estimated duty allocation of $94.736842 (one nineteenth of $1,800).",
+    "image_url": "",
+    "msds_url": "",
+    "coa_url": "",
+    "la_safe": true,
+    "verification_status": "verified",
+    "discontinued": null,
+    "moq_g": null,
+    "stain_test_result": "untested",
+    "stain_test_notes": "",
+    "do_not_use": false,
+    "use_restriction": "",
+    "item_total_usd": 215.5,
+    "allocated_shipping_duties_usd": 111.23520110526316,
+    "price_basis": "1 kg",
+    "estimated_duty_usd": 94.73684210526316,
+    "duties_usd": 94.73684210526316,
+    "pricing_status": "estimated duty"
+  },
+  {
+    "id": "KOLORTEK-3D-952",
+    "name": "3D-952 Violet / Red",
+    "vendor": "Kolortek Co., Ltd.",
+    "category": "Effect Pigment",
+    "finish": "Color Shift",
+    "color": "Violet/Red",
+    "particle_size_microns": "5–65 µm",
+    "solvent_safe": null,
+    "weight_g": 1000,
+    "volume_ml": null,
+    "price_usd": 563.5780741052631,
+    "order_id": "KTP260624811050933",
+    "order_date": "2026-07-16",
+    "location": "",
+    "notes": "1 kg production-size purchase at $435.50/kg. Product line cost $435.50. Includes proportional allocation of the uploaded invoice's $280 shipping and $35 handling fee ($33.34 allocated to this item). Includes a conservative estimated duty allocation of $94.736842 (one nineteenth of $1,800).",
+    "image_url": "",
+    "msds_url": "",
+    "coa_url": "",
+    "la_safe": false,
+    "verification_status": "verified",
+    "discontinued": null,
+    "moq_g": null,
+    "stain_test_result": "untested",
+    "stain_test_notes": "",
+    "do_not_use": false,
+    "use_restriction": "",
+    "item_total_usd": 435.5,
+    "allocated_shipping_duties_usd": 128.07807410526317,
+    "price_basis": "1 kg",
+    "estimated_duty_usd": 94.73684210526316,
+    "duties_usd": 94.73684210526316,
+    "pricing_status": "estimated duty"
+  },
+  {
+    "id": "KOLORTEK-3D-953",
+    "name": "3D-953 Violet Blue / Red",
+    "vendor": "Kolortek Co., Ltd.",
+    "category": "Effect Pigment",
+    "finish": "Color Shift",
+    "color": "Violet Blue/Red",
+    "particle_size_microns": "5–65 µm",
+    "solvent_safe": null,
+    "weight_g": 1000,
+    "volume_ml": null,
+    "price_usd": 563.5780741052631,
+    "order_id": "KTP260624811050933",
+    "order_date": "2026-07-16",
+    "location": "",
+    "notes": "1 kg production-size purchase at $435.50/kg. Product line cost $435.50. Includes proportional allocation of the uploaded invoice's $280 shipping and $35 handling fee ($33.34 allocated to this item). Includes a conservative estimated duty allocation of $94.736842 (one nineteenth of $1,800).",
+    "image_url": "",
+    "msds_url": "",
+    "coa_url": "",
+    "la_safe": false,
+    "verification_status": "verified",
+    "discontinued": null,
+    "moq_g": null,
+    "stain_test_result": "untested",
+    "stain_test_notes": "",
+    "do_not_use": false,
+    "use_restriction": "",
+    "item_total_usd": 435.5,
+    "allocated_shipping_duties_usd": 128.07807410526317,
+    "price_basis": "1 kg",
+    "estimated_duty_usd": 94.73684210526316,
+    "duties_usd": 94.73684210526316,
+    "pricing_status": "estimated duty"
+  },
+  {
+    "id": "KOLORTEK-3D-956",
+    "name": "3D-956 Green / Red",
+    "vendor": "Kolortek Co., Ltd.",
+    "category": "Effect Pigment",
+    "finish": "Color Shift",
+    "color": "Green/Red",
+    "particle_size_microns": "5–65 µm",
+    "solvent_safe": null,
+    "weight_g": 1000,
+    "volume_ml": null,
+    "price_usd": 563.5780741052631,
+    "order_id": "KTP260624811050933",
+    "order_date": "2026-07-16",
+    "location": "",
+    "notes": "1 kg production-size purchase at $435.50/kg. Product line cost $435.50. Includes proportional allocation of the uploaded invoice's $280 shipping and $35 handling fee ($33.34 allocated to this item). Includes a conservative estimated duty allocation of $94.736842 (one nineteenth of $1,800).",
+    "image_url": "",
+    "msds_url": "",
+    "coa_url": "",
+    "la_safe": false,
+    "verification_status": "verified",
+    "discontinued": null,
+    "moq_g": null,
+    "stain_test_result": "untested",
+    "stain_test_notes": "",
+    "do_not_use": false,
+    "use_restriction": "",
+    "item_total_usd": 435.5,
+    "allocated_shipping_duties_usd": 128.07807410526317,
+    "price_basis": "1 kg",
+    "estimated_duty_usd": 94.73684210526316,
+    "duties_usd": 94.73684210526316,
+    "pricing_status": "estimated duty"
+  },
+  {
+    "id": "KOLORTEK-3D-957",
+    "name": "3D-957 Blood Red",
+    "vendor": "Kolortek Co., Ltd.",
+    "category": "Effect Pigment",
+    "finish": "Color Shift",
+    "color": "Red",
+    "particle_size_microns": "5–65 µm",
+    "solvent_safe": null,
+    "weight_g": 1000,
+    "volume_ml": null,
+    "price_usd": 563.5780741052631,
+    "order_id": "KTP260624811050933",
+    "order_date": "2026-07-16",
+    "location": "",
+    "notes": "1 kg production-size purchase at $435.50/kg. Product line cost $435.50. Includes proportional allocation of the uploaded invoice's $280 shipping and $35 handling fee ($33.34 allocated to this item). Includes a conservative estimated duty allocation of $94.736842 (one nineteenth of $1,800).",
+    "image_url": "",
+    "msds_url": "",
+    "coa_url": "",
+    "la_safe": false,
+    "verification_status": "verified",
+    "discontinued": null,
+    "moq_g": null,
+    "stain_test_result": "untested",
+    "stain_test_notes": "",
+    "do_not_use": false,
+    "use_restriction": "",
+    "item_total_usd": 435.5,
+    "allocated_shipping_duties_usd": 128.07807410526317,
+    "price_basis": "1 kg",
+    "estimated_duty_usd": 94.73684210526316,
+    "duties_usd": 94.73684210526316,
+    "pricing_status": "estimated duty"
+  },
+  {
+    "id": "KOLORTEK-3D-958",
+    "name": "3D-958 Champagne Silver",
+    "vendor": "Kolortek Co., Ltd.",
+    "category": "Effect Pigment",
+    "finish": "Color Shift",
+    "color": "Champagne Silver",
+    "particle_size_microns": "5–65 µm",
+    "solvent_safe": null,
+    "weight_g": 1000,
+    "volume_ml": null,
+    "price_usd": 563.5780741052631,
+    "order_id": "KTP260624811050933",
+    "order_date": "2026-07-16",
+    "location": "",
+    "notes": "1 kg production-size purchase at $435.50/kg. Product line cost $435.50. Includes proportional allocation of the uploaded invoice's $280 shipping and $35 handling fee ($33.34 allocated to this item). Includes a conservative estimated duty allocation of $94.736842 (one nineteenth of $1,800).",
+    "image_url": "",
+    "msds_url": "",
+    "coa_url": "",
+    "la_safe": false,
+    "verification_status": "verified",
+    "discontinued": null,
+    "moq_g": null,
+    "stain_test_result": "untested",
+    "stain_test_notes": "",
+    "do_not_use": false,
+    "use_restriction": "",
+    "item_total_usd": 435.5,
+    "allocated_shipping_duties_usd": 128.07807410526317,
+    "price_basis": "1 kg",
+    "estimated_duty_usd": 94.73684210526316,
+    "duties_usd": 94.73684210526316,
+    "pricing_status": "estimated duty"
+  },
+  {
+    "id": "KOLORTEK-982130",
+    "name": "982130 Yellow/Red/Purple",
+    "vendor": "Kolortek Co., Ltd.",
+    "category": "Effect Pigment",
+    "finish": "Color Shift",
+    "color": "Yellow/Red/Purple",
+    "particle_size_microns": "30–115 µm",
+    "solvent_safe": null,
+    "weight_g": 1000,
+    "volume_ml": null,
+    "price_usd": 267.52448310526313,
+    "order_id": "KTP260624811050933",
+    "order_date": "2026-07-16",
+    "location": "",
+    "notes": "1 kg production-size purchase at $160.50/kg. Product line cost $160.50. Includes proportional allocation of the uploaded invoice's $280 shipping and $35 handling fee ($12.29 allocated to this item). Includes a conservative estimated duty allocation of $94.736842 (one nineteenth of $1,800).",
+    "image_url": "",
+    "msds_url": "",
+    "coa_url": "",
+    "la_safe": false,
+    "verification_status": "verified",
+    "discontinued": null,
+    "moq_g": null,
+    "stain_test_result": "untested",
+    "stain_test_notes": "",
+    "do_not_use": false,
+    "use_restriction": "",
+    "item_total_usd": 160.5,
+    "allocated_shipping_duties_usd": 107.02448310526316,
+    "price_basis": "1 kg",
+    "estimated_duty_usd": 94.73684210526316,
+    "duties_usd": 94.73684210526316,
+    "pricing_status": "estimated duty"
+  },
+  {
+    "id": "KOLORTEK-982335",
+    "name": "982335 Red/Purple/Blue",
+    "vendor": "Kolortek Co., Ltd.",
+    "category": "Effect Pigment",
+    "finish": "Color Shift",
+    "color": "Red/Purple/Blue",
+    "particle_size_microns": "30–150 µm",
+    "solvent_safe": null,
+    "weight_g": 1000,
+    "volume_ml": null,
+    "price_usd": 267.52448310526313,
+    "order_id": "KTP260624811050933",
+    "order_date": "2026-07-16",
+    "location": "",
+    "notes": "1 kg production-size purchase at $160.50/kg. Product line cost $160.50. Includes proportional allocation of the uploaded invoice's $280 shipping and $35 handling fee ($12.29 allocated to this item). Includes a conservative estimated duty allocation of $94.736842 (one nineteenth of $1,800).",
+    "image_url": "",
+    "msds_url": "",
+    "coa_url": "",
+    "la_safe": false,
+    "verification_status": "verified",
+    "discontinued": null,
+    "moq_g": null,
+    "stain_test_result": "untested",
+    "stain_test_notes": "",
+    "do_not_use": false,
+    "use_restriction": "",
+    "item_total_usd": 160.5,
+    "allocated_shipping_duties_usd": 107.02448310526316,
+    "price_basis": "1 kg",
+    "estimated_duty_usd": 94.73684210526316,
+    "duties_usd": 94.73684210526316,
+    "pricing_status": "estimated duty"
+  },
+  {
+    "id": "KOLORTEK-982430",
+    "name": "982430 Blue/Green",
+    "vendor": "Kolortek Co., Ltd.",
+    "category": "Effect Pigment",
+    "finish": "Color Shift",
+    "color": "Blue/Green",
+    "particle_size_microns": "30–115 µm",
+    "solvent_safe": null,
+    "weight_g": 1000,
+    "volume_ml": null,
+    "price_usd": 267.52448310526313,
+    "order_id": "KTP260624811050933",
+    "order_date": "2026-07-16",
+    "location": "",
+    "notes": "1 kg production-size purchase at $160.50/kg. Product line cost $160.50. Includes proportional allocation of the uploaded invoice's $280 shipping and $35 handling fee ($12.29 allocated to this item). Includes a conservative estimated duty allocation of $94.736842 (one nineteenth of $1,800).",
+    "image_url": "",
+    "msds_url": "",
+    "coa_url": "",
+    "la_safe": false,
+    "verification_status": "verified",
+    "discontinued": null,
+    "moq_g": null,
+    "stain_test_result": "untested",
+    "stain_test_notes": "",
+    "do_not_use": false,
+    "use_restriction": "",
+    "item_total_usd": 160.5,
+    "allocated_shipping_duties_usd": 107.02448310526316,
+    "price_basis": "1 kg",
+    "estimated_duty_usd": 94.73684210526316,
+    "duties_usd": 94.73684210526316,
+    "pricing_status": "estimated duty"
+  },
+  {
+    "id": "KOLORTEK-982435",
+    "name": "982435 Red/Purple/Blue",
+    "vendor": "Kolortek Co., Ltd.",
+    "category": "Effect Pigment",
+    "finish": "Color Shift",
+    "color": "Red/Purple/Blue",
+    "particle_size_microns": "30–150 µm",
+    "solvent_safe": null,
+    "weight_g": 1000,
+    "volume_ml": null,
+    "price_usd": 267.52448310526313,
+    "order_id": "KTP260624811050933",
+    "order_date": "2026-07-16",
+    "location": "",
+    "notes": "1 kg production-size purchase at $160.50/kg. Product line cost $160.50. Includes proportional allocation of the uploaded invoice's $280 shipping and $35 handling fee ($12.29 allocated to this item). Includes a conservative estimated duty allocation of $94.736842 (one nineteenth of $1,800).",
+    "image_url": "",
+    "msds_url": "",
+    "coa_url": "",
+    "la_safe": false,
+    "verification_status": "verified",
+    "discontinued": null,
+    "moq_g": null,
+    "stain_test_result": "untested",
+    "stain_test_notes": "",
+    "do_not_use": false,
+    "use_restriction": "",
+    "item_total_usd": 160.5,
+    "allocated_shipping_duties_usd": 107.02448310526316,
+    "price_basis": "1 kg",
+    "estimated_duty_usd": 94.73684210526316,
+    "duties_usd": 94.73684210526316,
+    "pricing_status": "estimated duty"
+  },
+  {
+    "id": "KOLORTEK-982445",
+    "name": "982445 Purple/Blue/Green",
+    "vendor": "Kolortek Co., Ltd.",
+    "category": "Effect Pigment",
+    "finish": "Color Shift",
+    "color": "Purple/Blue/Green",
+    "particle_size_microns": "45–215 µm",
+    "solvent_safe": null,
+    "weight_g": 1000,
+    "volume_ml": null,
+    "price_usd": 267.52448310526313,
+    "order_id": "KTP260624811050933",
+    "order_date": "2026-07-16",
+    "location": "",
+    "notes": "1 kg production-size purchase at $160.50/kg. Product line cost $160.50. Includes proportional allocation of the uploaded invoice's $280 shipping and $35 handling fee ($12.29 allocated to this item). Includes a conservative estimated duty allocation of $94.736842 (one nineteenth of $1,800).",
+    "image_url": "",
+    "msds_url": "",
+    "coa_url": "",
+    "la_safe": false,
+    "verification_status": "verified",
+    "discontinued": null,
+    "moq_g": null,
+    "stain_test_result": "untested",
+    "stain_test_notes": "",
+    "do_not_use": false,
+    "use_restriction": "",
+    "item_total_usd": 160.5,
+    "allocated_shipping_duties_usd": 107.02448310526316,
+    "price_basis": "1 kg",
+    "estimated_duty_usd": 94.73684210526316,
+    "duties_usd": 94.73684210526316,
+    "pricing_status": "estimated duty"
+  },
+  {
+    "id": "KOLORTEK-9822320",
+    "name": "9822320 Green/Red",
+    "vendor": "Kolortek Co., Ltd.",
+    "category": "Effect Pigment",
+    "finish": "Color Shift",
+    "color": "Green/Red",
+    "particle_size_microns": "20–120 µm",
+    "solvent_safe": null,
+    "weight_g": 1000,
+    "volume_ml": null,
+    "price_usd": 267.52448310526313,
+    "order_id": "KTP260624811050933",
+    "order_date": "2026-07-16",
+    "location": "",
+    "notes": "1 kg production-size purchase at $160.50/kg. Product line cost $160.50. Includes proportional allocation of the uploaded invoice's $280 shipping and $35 handling fee ($12.29 allocated to this item). Includes a conservative estimated duty allocation of $94.736842 (one nineteenth of $1,800).",
+    "image_url": "",
+    "msds_url": "",
+    "coa_url": "",
+    "la_safe": false,
+    "verification_status": "verified",
+    "discontinued": null,
+    "moq_g": null,
+    "stain_test_result": "untested",
+    "stain_test_notes": "",
+    "do_not_use": false,
+    "use_restriction": "",
+    "item_total_usd": 160.5,
+    "allocated_shipping_duties_usd": 107.02448310526316,
+    "price_basis": "1 kg",
+    "estimated_duty_usd": 94.73684210526316,
+    "duties_usd": 94.73684210526316,
+    "pricing_status": "estimated duty"
+  },
+  {
+    "id": "SM-TIMIRON-SPLENDID-BLUE",
+    "name": "Timiron Splendid Blue",
+    "vendor": "Superior Materials",
+    "category": "Effect Pigment",
+    "finish": "Pearl",
+    "color": "Blue",
+    "particle_size_microns": "10–60 µm",
+    "solvent_safe": null,
+    "weight_g": 1000,
+    "volume_ml": null,
+    "price_usd": 132.89,
+    "order_id": "II-SM-001",
+    "order_date": "2026-07-15",
+    "location": "",
+    "notes": "1 kg production-size order. Product cost $132.89. Timiron Splendid Blue is not expected to be available until October 2026 and will ship separately; its shipping cost is not included yet.",
+    "image_url": "",
+    "msds_url": "",
+    "coa_url": "",
+    "la_safe": true,
+    "verification_status": "verified",
+    "discontinued": null,
+    "moq_g": null,
+    "stain_test_result": "untested",
+    "stain_test_notes": "",
+    "do_not_use": false,
+    "use_restriction": "",
+    "item_total_usd": 132.89,
+    "allocated_shipping_duties_usd": 0,
+    "price_basis": "1 kg"
+  },
+  {
+    "id": "SM-TIMIRON-SPLENDID-COPPER",
+    "name": "Timiron Splendid Copper",
+    "vendor": "Superior Materials",
+    "category": "Effect Pigment",
+    "finish": "Pearl",
+    "color": "Copper",
+    "particle_size_microns": "10–60 µm",
+    "solvent_safe": null,
+    "weight_g": 1000,
+    "volume_ml": null,
+    "price_usd": 140.565,
+    "order_id": "II-SM-001",
+    "order_date": "2026-07-15",
+    "location": "",
+    "notes": "1 kg production-size purchase. Product cost $132.89. Includes an equal one-fourth share of the $30.70 shipping charge ($7.675 before display rounding), because all four shipped items were 1 kg.",
+    "image_url": "",
+    "msds_url": "",
+    "coa_url": "",
+    "la_safe": true,
+    "verification_status": "verified",
+    "discontinued": null,
+    "moq_g": null,
+    "stain_test_result": "untested",
+    "stain_test_notes": "",
+    "do_not_use": false,
+    "use_restriction": "",
+    "item_total_usd": 132.89,
+    "allocated_shipping_duties_usd": 7.675,
+    "price_basis": "1 kg"
+  },
+  {
+    "id": "SM-TIMIRON-SPLENDID-GREEN",
+    "name": "Timiron Splendid Green",
+    "vendor": "Superior Materials",
+    "category": "Effect Pigment",
+    "finish": "Pearl",
+    "color": "Green",
+    "particle_size_microns": "10–60 µm",
+    "solvent_safe": null,
+    "weight_g": 1000,
+    "volume_ml": null,
+    "price_usd": 132.89,
+    "order_id": "II-SM-001",
+    "order_date": "2026-07-15",
+    "location": "",
+    "notes": "1 kg production-size order. Product cost $132.89. Timiron Splendid Green is not expected to be available until October 2026 and will ship separately; its shipping cost is not included yet.",
+    "image_url": "",
+    "msds_url": "",
+    "coa_url": "",
+    "la_safe": true,
+    "verification_status": "verified",
+    "discontinued": null,
+    "moq_g": null,
+    "stain_test_result": "untested",
+    "stain_test_notes": "",
+    "do_not_use": false,
+    "use_restriction": "",
+    "item_total_usd": 132.89,
+    "allocated_shipping_duties_usd": 0,
+    "price_basis": "1 kg"
+  },
+  {
+    "id": "SM-TIMIRON-SPLENDID-RED",
+    "name": "Timiron Splendid Red",
+    "vendor": "Superior Materials",
+    "category": "Effect Pigment",
+    "finish": "Pearl",
+    "color": "Red",
+    "particle_size_microns": "10–60 µm",
+    "solvent_safe": null,
+    "weight_g": 1000,
+    "volume_ml": null,
+    "price_usd": 140.565,
+    "order_id": "II-SM-001",
+    "order_date": "2026-07-15",
+    "location": "",
+    "notes": "1 kg production-size purchase. Product cost $132.89. Includes an equal one-fourth share of the $30.70 shipping charge ($7.675 before display rounding), because all four shipped items were 1 kg.",
+    "image_url": "",
+    "msds_url": "",
+    "coa_url": "",
+    "la_safe": true,
+    "verification_status": "verified",
+    "discontinued": null,
+    "moq_g": null,
+    "stain_test_result": "untested",
+    "stain_test_notes": "",
+    "do_not_use": false,
+    "use_restriction": "",
+    "item_total_usd": 132.89,
+    "allocated_shipping_duties_usd": 7.675,
+    "price_basis": "1 kg"
+  },
+  {
+    "id": "SM-TIMIRON-SPLENDID-VIOLET",
+    "name": "Timiron Splendid Violet",
+    "vendor": "Superior Materials",
+    "category": "Effect Pigment",
+    "finish": "Pearl",
+    "color": "Violet",
+    "particle_size_microns": "10–60 µm",
+    "solvent_safe": null,
+    "weight_g": 1000,
+    "volume_ml": null,
+    "price_usd": 140.565,
+    "order_id": "II-SM-001",
+    "order_date": "2026-07-15",
+    "location": "",
+    "notes": "1 kg production-size purchase. Product cost $132.89. Includes an equal one-fourth share of the $30.70 shipping charge ($7.675 before display rounding), because all four shipped items were 1 kg.",
+    "image_url": "",
+    "msds_url": "",
+    "coa_url": "",
+    "la_safe": true,
+    "verification_status": "verified",
+    "discontinued": null,
+    "moq_g": null,
+    "stain_test_result": "untested",
+    "stain_test_notes": "",
+    "do_not_use": false,
+    "use_restriction": "",
+    "item_total_usd": 132.89,
+    "allocated_shipping_duties_usd": 7.675,
+    "price_basis": "1 kg"
+  },
+  {
+    "id": "SM-RONAFLUX-SPECULAR-BLUE",
+    "name": "Ronaflux Specular Blue",
+    "vendor": "Superior Materials",
+    "category": "Effect Pigment",
+    "finish": "Effect",
+    "color": "Blue",
+    "particle_size_microns": "10–60 µm",
+    "solvent_safe": null,
+    "weight_g": 1000,
+    "volume_ml": null,
+    "price_usd": 596.395,
+    "order_id": "II-SM-001",
+    "order_date": "2026-07-15",
+    "location": "",
+    "notes": "1 kg production-size purchase. Product cost $588.72. Includes an equal one-fourth share of the $30.70 shipping charge ($7.675 before display rounding), because all four shipped items were 1 kg.",
+    "image_url": "",
+    "msds_url": "",
+    "coa_url": "",
+    "la_safe": true,
+    "verification_status": "verified",
+    "discontinued": null,
+    "moq_g": null,
+    "stain_test_result": "untested",
+    "stain_test_notes": "",
+    "do_not_use": false,
+    "use_restriction": "",
+    "item_total_usd": 588.72,
+    "allocated_shipping_duties_usd": 7.675,
+    "price_basis": "1 kg"
+  },
+  {
+    "id": "VIVIFY-ABLAZE-ROSE-GOLD",
+    "name": "Ablaze Rose Gold",
+    "vendor": "Sandream Specialties / Vivify",
+    "category": "Magnetic Pigment",
+    "finish": "Magnetic",
+    "color": "Rose Gold",
+    "particle_size_microns": "12–33 µm",
+    "solvent_safe": null,
+    "weight_g": 1000,
+    "volume_ml": null,
+    "price_usd": 739.5,
+    "order_id": "II-VIVIFY-001",
+    "order_date": "2026-06-25",
+    "location": "",
+    "notes": "1 kg production-size purchase. Product cost $739.50. Shipping was not listed on the uploaded PO and is not included yet.",
+    "image_url": "",
+    "msds_url": "",
+    "coa_url": "",
+    "la_safe": false,
+    "verification_status": "verified",
+    "discontinued": null,
+    "moq_g": null,
+    "stain_test_result": "untested",
+    "stain_test_notes": "",
+    "do_not_use": false,
+    "use_restriction": "",
+    "item_total_usd": 739.5,
+    "allocated_shipping_duties_usd": 0,
+    "price_basis": "1 kg"
+  },
+  {
+    "id": "VIVIFY-FIESTA-EMERALD-COAST",
+    "name": "Fiesta Emerald Coast",
+    "vendor": "Sandream Specialties / Vivify",
+    "category": "Effect Pigment",
+    "finish": "Effect",
+    "color": "Emerald Green",
+    "particle_size_microns": "10–60 µm",
+    "solvent_safe": null,
+    "weight_g": 1000,
+    "volume_ml": null,
+    "price_usd": 385.0,
+    "order_id": "II-VIVIFY-001",
+    "order_date": "2026-06-25",
+    "location": "",
+    "notes": "1 kg production-size purchase. Product cost $385.00. Shipping was not listed on the uploaded PO and is not included yet.",
+    "image_url": "",
+    "msds_url": "",
+    "coa_url": "",
+    "la_safe": false,
+    "verification_status": "verified",
+    "discontinued": null,
+    "moq_g": null,
+    "stain_test_result": "untested",
+    "stain_test_notes": "",
+    "do_not_use": false,
+    "use_restriction": "",
+    "item_total_usd": 385.0,
+    "allocated_shipping_duties_usd": 0,
+    "price_basis": "1 kg"
+  },
+  {
+    "id": "VIVIFY-SPECTRA-GALAXY-SILVER",
+    "name": "Spectra Galaxy Silver",
+    "vendor": "Sandream Specialties / Vivify",
+    "category": "Effect Pigment",
+    "finish": "Effect",
+    "color": "Silver",
+    "particle_size_microns": "0.008 in hex (≈203 µm)",
+    "solvent_safe": null,
+    "weight_g": 1000,
+    "volume_ml": null,
+    "price_usd": 415.0,
+    "order_id": "II-VIVIFY-001",
+    "order_date": "2026-06-25",
+    "location": "",
+    "notes": "1 kg production-size purchase. Product cost $415.00. Shipping was not listed on the uploaded PO and is not included yet.",
+    "image_url": "",
+    "msds_url": "",
+    "coa_url": "",
+    "la_safe": false,
+    "verification_status": "verified",
+    "discontinued": null,
+    "moq_g": null,
+    "stain_test_result": "untested",
+    "stain_test_notes": "",
+    "do_not_use": false,
+    "use_restriction": "",
+    "item_total_usd": 415.0,
+    "allocated_shipping_duties_usd": 0,
+    "price_basis": "1 kg"
+  },
+  {
+    "id": "VIVIFY-SPECTRA-SHIMMER-SILVER",
+    "name": "Spectra Shimmer Silver",
+    "vendor": "Sandream Specialties / Vivify",
+    "category": "Effect Pigment",
+    "finish": "Effect",
+    "color": "Silver",
+    "particle_size_microns": "0.004 × 0.002 in (≈102 × 51 µm)",
+    "solvent_safe": null,
+    "weight_g": 1000,
+    "volume_ml": null,
+    "price_usd": 305.0,
+    "order_id": "II-VIVIFY-001",
+    "order_date": "2026-06-25",
+    "location": "",
+    "notes": "1 kg production-size purchase. Product cost $305.00. Shipping was not listed on the uploaded PO and is not included yet.",
+    "image_url": "",
+    "msds_url": "",
+    "coa_url": "",
+    "la_safe": false,
+    "verification_status": "verified",
+    "discontinued": null,
+    "moq_g": null,
+    "stain_test_result": "untested",
+    "stain_test_notes": "",
+    "do_not_use": false,
+    "use_restriction": "",
+    "item_total_usd": 305.0,
+    "allocated_shipping_duties_usd": 0,
+    "price_basis": "1 kg"
+  },
+  {
+    "id": "ZS-SYNTRAN-KL219CG",
+    "name": "Syntran KL219CG",
+    "vendor": "Zschimmer & Schwarz Interpolymer Inc.",
+    "category": "Raw Material",
+    "finish": "",
+    "color": "",
+    "particle_size_microns": "N/A — liquid polymer",
+    "solvent_safe": null,
+    "weight_g": 18143.6948,
+    "volume_ml": null,
+    "price_usd": 657.666587,
+    "order_id": "II-ZS-2026-001",
+    "order_date": "2026-03-30",
+    "location": "",
+    "notes": "40 lb production-size pail. Product line cost $558.00. Includes proportional allocation of the uploaded invoice's $300 freight ($99.67 allocated to this item).",
+    "image_url": "",
+    "msds_url": "",
+    "coa_url": "",
+    "la_safe": true,
+    "verification_status": "verified",
+    "discontinued": null,
+    "moq_g": null,
+    "stain_test_result": "untested",
+    "stain_test_notes": "",
+    "do_not_use": false,
+    "use_restriction": "",
+    "item_total_usd": 558.0,
+    "allocated_shipping_duties_usd": 99.666587,
+    "price_basis": "40 lb pail"
+  },
+  {
+    "id": "ZS-SYNTRAN-5712",
+    "name": "Syntran 5712",
+    "vendor": "Zschimmer & Schwarz Interpolymer Inc.",
+    "category": "Raw Material",
+    "finish": "",
+    "color": "",
+    "particle_size_microns": "N/A — liquid polymer emulsion",
+    "solvent_safe": null,
+    "weight_g": 18143.6948,
+    "volume_ml": null,
+    "price_usd": 692.55356,
+    "order_id": "II-ZS-2026-001",
+    "order_date": "2026-03-30",
+    "location": "",
+    "notes": "40 lb production-size pail. Product line cost $587.60. Includes proportional allocation of the uploaded invoice's $300 freight ($104.95 allocated to this item).",
+    "image_url": "",
+    "msds_url": "",
+    "coa_url": "",
+    "la_safe": true,
+    "verification_status": "verified",
+    "discontinued": null,
+    "moq_g": null,
+    "stain_test_result": "untested",
+    "stain_test_notes": "",
+    "do_not_use": false,
+    "use_restriction": "",
+    "item_total_usd": 587.6,
+    "allocated_shipping_duties_usd": 104.95356,
+    "price_basis": "40 lb pail"
+  },
+  {
+    "id": "ZS-SYNTRAN-5620CG",
+    "name": "Syntran 5620CG",
+    "vendor": "Zschimmer & Schwarz Interpolymer Inc.",
+    "category": "Raw Material",
+    "finish": "",
+    "color": "",
+    "particle_size_microns": "N/A — liquid polymer emulsion",
+    "solvent_safe": null,
+    "weight_g": 18143.6948,
+    "volume_ml": null,
+    "price_usd": 629.379852,
+    "order_id": "II-ZS-2026-001",
+    "order_date": "2026-03-30",
+    "location": "",
+    "notes": "40 lb production-size pail. Product line cost $534.00. Includes proportional allocation of the uploaded invoice's $300 freight ($95.38 allocated to this item).",
+    "image_url": "",
+    "msds_url": "",
+    "coa_url": "",
+    "la_safe": true,
+    "verification_status": "verified",
+    "discontinued": null,
+    "moq_g": null,
+    "stain_test_result": "untested",
+    "stain_test_notes": "",
+    "do_not_use": false,
+    "use_restriction": "",
+    "item_total_usd": 534.0,
+    "allocated_shipping_duties_usd": 95.379852,
+    "price_basis": "40 lb pail"
+  },
+  {
+    "id": "KOBO-INBP75EB",
+    "name": "INBP75EB",
+    "vendor": "Kobo Products Inc.",
+    "category": "Pigment Dispersion",
+    "finish": "",
+    "color": "Black",
+    "particle_size_microns": "",
+    "solvent_safe": null,
+    "weight_g": 1000,
+    "volume_ml": null,
+    "unit_count": null,
+    "unit_name": "",
+    "price_usd": 67.73,
+    "order_id": "",
+    "order_date": "",
+    "location": "",
+    "notes": "1 kg ordered. Product cost $45.62. Includes an assumed $22.11 FedEx charge for this package. 08/31/2026 availability and shipment shown. Marked not LA safe.",
+    "image_url": "",
+    "msds_url": "",
+    "coa_url": "",
+    "la_safe": false,
+    "verification_status": "verified",
+    "discontinued": null,
+    "moq_g": null,
+    "stain_test_result": "untested",
+    "stain_test_notes": "",
+    "do_not_use": false,
+    "use_restriction": "",
+    "item_total_usd": 45.62,
+    "shipping_usd": 22.11,
+    "fees_usd": 0,
+    "duties_usd": 0,
+    "allocated_shipping_duties_usd": 22.11,
+    "price_basis": "1 kg",
+    "pricing_status": "estimated shipping"
+  },
+  {
+    "id": "KOBO-INBP40R30A",
+    "name": "INBP40R30A",
+    "vendor": "Kobo Products Inc.",
+    "category": "Pigment Dispersion",
+    "finish": "",
+    "color": "Red",
+    "particle_size_microns": "",
+    "solvent_safe": null,
+    "weight_g": 1000,
+    "volume_ml": null,
+    "unit_count": null,
+    "unit_name": "",
+    "price_usd": 215.41,
+    "order_id": "",
+    "order_date": "",
+    "location": "",
+    "notes": "1 kg ordered. Product cost $193.30. Includes an assumed $22.11 FedEx charge for this package. Availability pending; 08/18/2026 shipment date shown. Marked not LA safe.",
+    "image_url": "",
+    "msds_url": "",
+    "coa_url": "",
+    "la_safe": false,
+    "verification_status": "verified",
+    "discontinued": null,
+    "moq_g": null,
+    "stain_test_result": "untested",
+    "stain_test_notes": "",
+    "do_not_use": false,
+    "use_restriction": "",
+    "item_total_usd": 193.3,
+    "shipping_usd": 22.11,
+    "fees_usd": 0,
+    "duties_usd": 0,
+    "allocated_shipping_duties_usd": 22.11,
+    "price_basis": "1 kg",
+    "pricing_status": "estimated shipping"
+  },
+  {
+    "id": "KOBO-INBP50MV",
+    "name": "INBP50MV",
+    "vendor": "Kobo Products Inc.",
+    "category": "Pigment Dispersion",
+    "finish": "",
+    "color": "Violet",
+    "particle_size_microns": "",
+    "solvent_safe": null,
+    "weight_g": 1000,
+    "volume_ml": null,
+    "unit_count": null,
+    "unit_name": "",
+    "price_usd": 103.34,
+    "order_id": "",
+    "order_date": "",
+    "location": "",
+    "notes": "1 kg ordered. Product cost $81.23. Includes an assumed $22.11 FedEx charge for this package. Availability pending; 08/18/2026 shipment date shown. Marked not LA safe.",
+    "image_url": "",
+    "msds_url": "",
+    "coa_url": "",
+    "la_safe": false,
+    "verification_status": "verified",
+    "discontinued": null,
+    "moq_g": null,
+    "stain_test_result": "untested",
+    "stain_test_notes": "",
+    "do_not_use": false,
+    "use_restriction": "",
+    "item_total_usd": 81.23,
+    "shipping_usd": 22.11,
+    "fees_usd": 0,
+    "duties_usd": 0,
+    "allocated_shipping_duties_usd": 22.11,
+    "price_basis": "1 kg",
+    "pricing_status": "estimated shipping"
+  },
+  {
+    "id": "KOBO-INBP70BUB",
+    "name": "INBP70BUB",
+    "vendor": "Kobo Products Inc.",
+    "category": "Pigment Dispersion",
+    "finish": "",
+    "color": "Blue",
+    "particle_size_microns": "",
+    "solvent_safe": null,
+    "weight_g": 1000,
+    "volume_ml": null,
+    "unit_count": null,
+    "unit_name": "",
+    "price_usd": 78.11,
+    "order_id": "",
+    "order_date": "",
+    "location": "",
+    "notes": "1 kg ordered. Product cost $56.00. Includes an assumed $22.11 FedEx charge for this package. Availability pending; 08/18/2026 shipment date shown. Marked not LA safe.",
+    "image_url": "",
+    "msds_url": "",
+    "coa_url": "",
+    "la_safe": false,
+    "verification_status": "verified",
+    "discontinued": null,
+    "moq_g": null,
+    "stain_test_result": "untested",
+    "stain_test_notes": "",
+    "do_not_use": false,
+    "use_restriction": "",
+    "item_total_usd": 56.0,
+    "shipping_usd": 22.11,
+    "fees_usd": 0,
+    "duties_usd": 0,
+    "allocated_shipping_duties_usd": 22.11,
+    "price_basis": "1 kg",
+    "pricing_status": "estimated shipping"
+  },
+  {
+    "id": "KOBO-INBP50Y6A",
+    "name": "INBP50Y6A",
+    "vendor": "Kobo Products Inc.",
+    "category": "Pigment Dispersion",
+    "finish": "",
+    "color": "Yellow",
+    "particle_size_microns": "",
+    "solvent_safe": null,
+    "weight_g": 1000,
+    "volume_ml": null,
+    "unit_count": null,
+    "unit_name": "",
+    "price_usd": 87.44,
+    "order_id": "",
+    "order_date": "",
+    "location": "",
+    "notes": "1 kg ordered. Product cost $65.33. Includes an assumed $22.11 FedEx charge for this package. 08/31/2026 availability and shipment shown. Marked not LA safe.",
+    "image_url": "",
+    "msds_url": "",
+    "coa_url": "",
+    "la_safe": false,
+    "verification_status": "verified",
+    "discontinued": null,
+    "moq_g": null,
+    "stain_test_result": "untested",
+    "stain_test_notes": "",
+    "do_not_use": false,
+    "use_restriction": "",
+    "item_total_usd": 65.33,
+    "shipping_usd": 22.11,
+    "fees_usd": 0,
+    "duties_usd": 0,
+    "allocated_shipping_duties_usd": 22.11,
+    "price_basis": "1 kg",
+    "pricing_status": "estimated shipping"
+  },
+  {
+    "vendor": "Glitter Unique",
+    "category": "Base",
+    "finish": "",
+    "color": "",
+    "particle_size_microns": "N/A — liquid base",
+    "solvent_safe": true,
+    "weight_g": 3861.12001968,
+    "volume_ml": 3785.411784,
+    "unit_count": 1,
+    "unit_name": "gallon",
+    "price_usd": 113.77,
+    "order_id": "",
+    "order_date": "",
+    "location": "",
+    "image_url": "",
+    "msds_url": "",
+    "coa_url": "",
+    "la_safe": false,
+    "verification_status": "verified",
+    "discontinued": null,
+    "moq_g": null,
+    "stain_test_result": "untested",
+    "stain_test_notes": "",
+    "do_not_use": false,
+    "use_restriction": "",
+    "item_total_usd": 96.0,
+    "shipping_usd": 17.77,
+    "fees_usd": 0,
+    "duties_usd": 0,
+    "allocated_shipping_duties_usd": 17.77,
+    "price_basis": "1 gallon / 128 fl oz",
+    "id": "GU-GELISH-1G",
+    "name": "21 Free Gel-Ish Suspension Base",
+    "notes": "1 gallon. Product cost $96.00 plus $17.77 shipping; landed total $113.77. Measured density is 1.02 g/mL (2.04 g per 2.00 mL), giving an estimated net weight of 3861.12 g and a landed cost of about $0.02947 per gram.",
+    "pricing_status": "measured density"
+  },
+  {
+    "vendor": "Glitter Unique",
+    "category": "Base",
+    "finish": "",
+    "color": "",
+    "particle_size_microns": "N/A — liquid base",
+    "solvent_safe": true,
+    "weight_g": 3861.12001968,
+    "volume_ml": 3785.411784,
+    "unit_count": 1,
+    "unit_name": "gallon",
+    "price_usd": 113.77,
+    "order_id": "",
+    "order_date": "",
+    "location": "",
+    "image_url": "",
+    "msds_url": "",
+    "coa_url": "",
+    "la_safe": false,
+    "verification_status": "verified",
+    "discontinued": null,
+    "moq_g": null,
+    "stain_test_result": "untested",
+    "stain_test_notes": "",
+    "do_not_use": false,
+    "use_restriction": "",
+    "item_total_usd": 96.0,
+    "shipping_usd": 17.77,
+    "fees_usd": 0,
+    "duties_usd": 0,
+    "allocated_shipping_duties_usd": 17.77,
+    "price_basis": "1 gallon / 128 fl oz",
+    "id": "GU-GLITTER-BASE-1G",
+    "name": "21 Free Glitter Suspension Base",
+    "notes": "1 gallon. Product cost $96.00 plus $17.77 shipping; landed total $113.77. Measured density is 1.02 g/mL (2.04 g per 2.00 mL), giving an estimated net weight of 3861.12 g and a landed cost of about $0.02947 per gram.",
+    "pricing_status": "measured density"
+  },
+  {
+    "id": "GU-MXB-0004-5000",
+    "name": "3 mm Mixing Balls — Main-Line Bottles",
+    "vendor": "Glitter Unique",
+    "category": "Bottle Component",
+    "finish": "",
+    "color": "",
+    "particle_size_microns": "3 mm",
+    "solvent_safe": null,
+    "weight_g": null,
+    "volume_ml": null,
+    "unit_count": 5000,
+    "unit_name": "balls",
+    "price_usd": 65.25,
+    "order_id": "",
+    "order_date": "",
+    "location": "",
+    "notes": "5,000 mixing balls. Product cost $55.00 plus $10.25 shipping; landed total $65.25. Main-line bottles use two balls each.",
+    "image_url": "",
+    "msds_url": "",
+    "coa_url": "",
+    "la_safe": null,
+    "verification_status": "verified",
+    "discontinued": null,
+    "moq_g": null,
+    "stain_test_result": "untested",
+    "stain_test_notes": "",
+    "do_not_use": false,
+    "use_restriction": "",
+    "item_total_usd": 55.0,
+    "shipping_usd": 10.25,
+    "fees_usd": 0,
+    "duties_usd": 0,
+    "allocated_shipping_duties_usd": 10.25,
+    "price_basis": "5,000 balls"
+  },
+  {
+    "id": "ONLINELABELS-OL4904LP-1440",
+    "name": "Main-Line Bottle Bottom Labels — 0.75 × 0.5 in",
+    "vendor": "OnlineLabels",
+    "category": "Bottle Component",
+    "finish": "Weatherproof polyester",
+    "color": "",
+    "particle_size_microns": "",
+    "solvent_safe": null,
+    "weight_g": null,
+    "volume_ml": null,
+    "unit_count": 1440,
+    "unit_name": "labels",
+    "price_usd": 18.78,
+    "order_id": "7828849",
+    "order_date": "2026-01-12",
+    "location": "",
+    "notes": "Ten sheets at 144 labels per sheet, for 1,440 labels total. Product cost $13.83 plus $4.95 shipping; landed total $18.78. These are the only labels added to the bottles; the logo is screen printed.",
+    "image_url": "",
+    "msds_url": "",
+    "coa_url": "",
+    "la_safe": null,
+    "verification_status": "verified",
+    "discontinued": null,
+    "moq_g": null,
+    "stain_test_result": "untested",
+    "stain_test_notes": "",
+    "do_not_use": false,
+    "use_restriction": "",
+    "item_total_usd": 13.83,
+    "shipping_usd": 4.95,
+    "fees_usd": 0,
+    "duties_usd": 0,
+    "allocated_shipping_duties_usd": 4.95,
+    "price_basis": "1,440 labels"
+  },
+  {
+    "id": "LEESON-MAIN-BOTTLES-1001",
+    "name": "12.5 mL Main-Line Square Bottles — Screen Printed",
+    "vendor": "Leeson Glass (Alibaba)",
+    "category": "Bottle",
+    "finish": "Screen printed",
+    "color": "",
+    "particle_size_microns": "",
+    "solvent_safe": null,
+    "weight_g": null,
+    "volume_ml": null,
+    "unit_count": 1001,
+    "unit_name": "bottles",
+    "unit_volume_ml": 12.5,
+    "price_usd": 504.86,
+    "order_id": "",
+    "order_date": "2025-11-06",
+    "location": "",
+    "notes": "1,001 main-line bottles. Product cost $195.20 plus $295.00 freight and $14.66 Alibaba payment-processing fee; landed total $504.86. No separate duty recorded. Screen-printed logo is included.",
+    "image_url": "",
+    "msds_url": "",
+    "coa_url": "",
+    "la_safe": null,
+    "verification_status": "verified",
+    "discontinued": null,
+    "moq_g": null,
+    "stain_test_result": "untested",
+    "stain_test_notes": "",
+    "do_not_use": false,
+    "use_restriction": "",
+    "item_total_usd": 195.2,
+    "shipping_usd": 295.0,
+    "fees_usd": 14.66,
+    "duties_usd": 0,
+    "allocated_shipping_duties_usd": 309.66,
+    "price_basis": "1,001 bottles"
+  },
+  {
+    "id": "SHINE-LA-BOTTLES-500",
+    "name": "5 mL Little Adventurers Bottles — Screen Printed",
+    "vendor": "Shine Packaging (Alibaba)",
+    "category": "Bottle",
+    "finish": "Screen printed",
+    "color": "",
+    "particle_size_microns": "",
+    "solvent_safe": null,
+    "weight_g": null,
+    "volume_ml": null,
+    "unit_count": 500,
+    "unit_name": "bottles",
+    "unit_volume_ml": 5,
+    "price_usd": 298.83,
+    "order_id": "",
+    "order_date": "2025-11-14",
+    "location": "",
+    "notes": "500 Little Adventurers bottles. Product cost $150.00 plus $140.00 freight and $8.83 Alibaba payment-processing fee; landed total $298.83. No separate duty recorded. Screen-printed logo is included.",
+    "image_url": "",
+    "msds_url": "",
+    "coa_url": "",
+    "la_safe": null,
+    "verification_status": "verified",
+    "discontinued": null,
+    "moq_g": null,
+    "stain_test_result": "untested",
+    "stain_test_notes": "",
+    "do_not_use": false,
+    "use_restriction": "",
+    "item_total_usd": 150.0,
+    "shipping_usd": 140.0,
+    "fees_usd": 8.83,
+    "duties_usd": 0,
+    "allocated_shipping_duties_usd": 148.83,
+    "price_basis": "500 bottles"
+  },
+  {
+    "id": "LA-3MM-BOROSILICATE-BEADS-1LB",
+    "name": "3 mm Borosilicate Glass Beads — LA Bottles",
+    "vendor": "Supplier TBD",
+    "category": "Bottle Component",
+    "finish": "Borosilicate glass",
+    "color": "Clear",
+    "particle_size_microns": "3 mm",
+    "solvent_safe": null,
+    "weight_g": 453.59237,
+    "volume_ml": null,
+    "unit_count": 12500,
+    "unit_name": "beads",
+    "price_usd": 262.03,
+    "order_id": "",
+    "order_date": "",
+    "location": "",
+    "notes": "Conservative pricing placeholder: $262.03 landed for approximately 12,500 3 mm borosilicate beads (about 1 lb). Little Adventurers bottles use two beads each. Estimated cost is about $0.02096 per bead, $0.04192 per bottle, or $0.16770 per four-polish LA collection. Final supplier/shipping cost is still pending.",
+    "image_url": "",
+    "msds_url": "",
+    "coa_url": "",
+    "la_safe": null,
+    "verification_status": "verified",
+    "discontinued": null,
+    "moq_g": null,
+    "stain_test_result": "untested",
+    "stain_test_notes": "",
+    "do_not_use": false,
+    "use_restriction": "",
+    "item_total_usd": 262.03,
+    "shipping_usd": 0,
+    "fees_usd": 0,
+    "duties_usd": 0,
+    "allocated_shipping_duties_usd": 0,
+    "price_basis": "approximately 12,500 beads / 1 lb",
+    "pricing_status": "estimate; count supplied"
+  },
+  {
+    "id": "SHENGHE-RIGID-COLLECTOR-BOX",
+    "name": "Rigid Collector Box",
+    "vendor": "Weihai Shenghe Printing Co., Ltd.",
+    "category": "Collection Packaging",
+    "finish": "",
+    "color": "",
+    "particle_size_microns": "",
+    "solvent_safe": null,
+    "weight_g": null,
+    "volume_ml": null,
+    "unit_count": 200,
+    "unit_name": "pieces",
+    "price_usd": 978.9079754601227,
+    "order_id": "PI 32626 / 20260326Y",
+    "order_date": "2026-03-26",
+    "location": "",
+    "notes": "Rigid black box with EVA/flocked insert. 200 pieces. Product line cost $722.00. Includes $256.907975 of the $348 freight, allocated in proportion to the $978 product subtotal. No separate duty recorded.",
+    "image_url": "",
+    "msds_url": "",
+    "coa_url": "",
+    "la_safe": null,
+    "verification_status": "verified",
+    "discontinued": null,
+    "moq_g": null,
+    "stain_test_result": "untested",
+    "stain_test_notes": "",
+    "do_not_use": false,
+    "use_restriction": "",
+    "item_total_usd": 722.0,
+    "shipping_usd": 256.9079754601227,
+    "fees_usd": 0,
+    "duties_usd": 0,
+    "allocated_shipping_duties_usd": 256.9079754601227,
+    "price_basis": "200 pieces"
+  },
+  {
+    "id": "SHENGHE-LA-WINDOW-BOX",
+    "name": "Little Adventurers Window Carton with Printed Insert",
+    "vendor": "Weihai Shenghe Printing Co., Ltd.",
+    "category": "Collection Packaging",
+    "finish": "",
+    "color": "",
+    "particle_size_microns": "",
+    "solvent_safe": null,
+    "weight_g": null,
+    "volume_ml": null,
+    "unit_count": 200,
+    "unit_name": "pieces",
+    "price_usd": 211.50920245398774,
+    "order_id": "PI 32626 / 20260326Y",
+    "order_date": "2026-03-26",
+    "location": "",
+    "notes": "Printed window carton with internal printed paper insert. 200 pieces. Product line cost $156.00. Includes $55.509202 of the $348 freight, allocated in proportion to the $978 product subtotal. No separate duty recorded.",
+    "image_url": "",
+    "msds_url": "",
+    "coa_url": "",
+    "la_safe": null,
+    "verification_status": "verified",
+    "discontinued": null,
+    "moq_g": null,
+    "stain_test_result": "untested",
+    "stain_test_notes": "",
+    "do_not_use": false,
+    "use_restriction": "",
+    "item_total_usd": 156.0,
+    "shipping_usd": 55.50920245398773,
+    "fees_usd": 0,
+    "duties_usd": 0,
+    "allocated_shipping_duties_usd": 55.50920245398773,
+    "price_basis": "200 pieces"
+  },
+  {
+    "id": "SHENGHE-CORRUGATED-COLLECTOR-SHIPPER",
+    "name": "Collector Box Corrugated Shipping Carton",
+    "vendor": "Weihai Shenghe Printing Co., Ltd.",
+    "category": "Collection Packaging",
+    "finish": "",
+    "color": "",
+    "particle_size_microns": "",
+    "solvent_safe": null,
+    "weight_g": null,
+    "volume_ml": null,
+    "unit_count": 200,
+    "unit_name": "pieces",
+    "price_usd": 135.58282208588957,
+    "order_id": "PI 32626 / 20260326Y",
+    "order_date": "2026-03-26",
+    "location": "",
+    "notes": "Three-ply corrugated carton matched to the rigid box. 200 pieces. Product line cost $100.00. Includes $35.582822 of the $348 freight, allocated in proportion to the $978 product subtotal. No separate duty recorded.",
+    "image_url": "",
+    "msds_url": "",
+    "coa_url": "",
+    "la_safe": null,
+    "verification_status": "verified",
+    "discontinued": null,
+    "moq_g": null,
+    "stain_test_result": "untested",
+    "stain_test_notes": "",
+    "do_not_use": false,
+    "use_restriction": "",
+    "item_total_usd": 100.0,
+    "shipping_usd": 35.58282208588957,
+    "fees_usd": 0,
+    "duties_usd": 0,
+    "allocated_shipping_duties_usd": 35.58282208588957,
+    "price_basis": "200 pieces"
+  },
+  {
+    "finish": "",
+    "color": "Blue",
+    "particle_size_microns": "N/A — liquid",
+    "solvent_safe": null,
+    "volume_ml": null,
+    "unit_count": null,
+    "unit_name": "",
+    "order_id": "",
+    "order_date": "",
+    "location": "",
+    "image_url": "",
+    "msds_url": "",
+    "coa_url": "",
+    "verification_status": "verified",
+    "discontinued": null,
+    "moq_g": null,
+    "stain_test_result": "untested",
+    "stain_test_notes": "",
+    "do_not_use": false,
+    "use_restriction": "",
+    "fees_usd": 0,
+    "id": "GU-COLORDROP-ROYAL-BLUE-4OZ",
+    "name": "ColorDrop Royal Blue",
+    "vendor": "Glitter Unique",
+    "category": "Liquid Colorant",
+    "weight_g": 113.3980925,
+    "price_usd": 27.745,
+    "notes": "4 oz production-size purchase. ColorDrop Royal Blue and ColorDrop Cranberry cost $55.49 combined including shipping. Because the invoice was not itemized, the landed total is split evenly: $27.745 per 4 oz. For formula costing, 4 oz is provisionally treated as 113.398 g, or about $0.24467/g.",
+    "la_safe": false,
+    "item_total_usd": 27.745,
+    "shipping_usd": 0,
+    "duties_usd": 0,
+    "allocated_shipping_duties_usd": 0,
+    "price_basis": "4 oz; half of $55.49 combined landed order",
+    "pricing_status": "landed total split evenly; weight conversion provisional"
+  },
+  {
+    "finish": "",
+    "color": "Cranberry Red",
+    "particle_size_microns": "N/A — liquid",
+    "solvent_safe": null,
+    "volume_ml": null,
+    "unit_count": null,
+    "unit_name": "",
+    "order_id": "",
+    "order_date": "",
+    "location": "",
+    "image_url": "",
+    "msds_url": "",
+    "coa_url": "",
+    "verification_status": "verified",
+    "discontinued": null,
+    "moq_g": null,
+    "stain_test_result": "untested",
+    "stain_test_notes": "",
+    "do_not_use": false,
+    "use_restriction": "",
+    "fees_usd": 0,
+    "id": "GU-COLORDROP-CRANBERRY-4OZ",
+    "name": "ColorDrop Cranberry",
+    "vendor": "Glitter Unique",
+    "category": "Liquid Colorant",
+    "weight_g": 113.3980925,
+    "price_usd": 27.745,
+    "notes": "4 oz production-size purchase. ColorDrop Royal Blue and ColorDrop Cranberry cost $55.49 combined including shipping. Because the invoice was not itemized, the landed total is split evenly: $27.745 per 4 oz. For formula costing, 4 oz is provisionally treated as 113.398 g, or about $0.24467/g.",
+    "la_safe": false,
+    "item_total_usd": 27.745,
+    "shipping_usd": 0,
+    "duties_usd": 0,
+    "allocated_shipping_duties_usd": 0,
+    "price_basis": "4 oz; half of $55.49 combined landed order",
+    "pricing_status": "landed total split evenly; weight conversion provisional"
+  },
+  {
+    "finish": "",
+    "color": "",
+    "particle_size_microns": "N/A — liquid",
+    "solvent_safe": null,
+    "volume_ml": null,
+    "unit_count": null,
+    "unit_name": "",
+    "order_id": "",
+    "order_date": "",
+    "location": "",
+    "image_url": "",
+    "msds_url": "",
+    "coa_url": "",
+    "verification_status": "verified",
+    "discontinued": null,
+    "moq_g": null,
+    "stain_test_result": "untested",
+    "stain_test_notes": "",
+    "do_not_use": false,
+    "use_restriction": "",
+    "fees_usd": 0,
+    "id": "MSR-PNB-1000G",
+    "name": "Propylene Glycol n-Butyl Ether (PnB)",
+    "vendor": "MySkinRecipes",
+    "category": "Raw Material",
+    "weight_g": 1000,
+    "price_usd": 59.6835372069317,
+    "la_safe": true,
+    "notes": "Receipt merchandise price $29.80. The two-item order had a $39.24 merchandise subtotal, $7.85 discount, $17.20 shipping, and $30.00 estimated duties, for $78.59 landed total. Discount, shipping, and duties are allocated in proportion to pre-discount merchandise value. Allocated landed cost: $59.68 ($0.05968/g).",
+    "item_total_usd": 23.83848114169215,
+    "shipping_usd": 13.062181447502548,
+    "duties_usd": 22.782874617737004,
+    "allocated_shipping_duties_usd": 35.845056065239554,
+    "price_basis": "1,000 g",
+    "pricing_status": "actual receipt plus estimated duties"
+  },
+  {
+    "finish": "",
+    "color": "",
+    "particle_size_microns": "N/A — liquid",
+    "solvent_safe": null,
+    "volume_ml": null,
+    "unit_count": null,
+    "unit_name": "",
+    "order_id": "",
+    "order_date": "",
+    "location": "",
+    "image_url": "",
+    "msds_url": "",
+    "coa_url": "",
+    "verification_status": "verified",
+    "discontinued": null,
+    "moq_g": null,
+    "stain_test_result": "untested",
+    "stain_test_notes": "",
+    "do_not_use": false,
+    "use_restriction": "",
+    "fees_usd": 0,
+    "id": "MSR-XFOAM-100G",
+    "name": "X-Foam (Anti-Foaming Emulsion / Defoamer)",
+    "vendor": "MySkinRecipes",
+    "category": "Defoamer",
+    "weight_g": 100,
+    "price_usd": 18.906462793068297,
+    "la_safe": true,
+    "notes": "Receipt merchandise price $9.44. The two-item order had a $39.24 merchandise subtotal, $7.85 discount, $17.20 shipping, and $30.00 estimated duties, for $78.59 landed total. Discount, shipping, and duties are allocated in proportion to pre-discount merchandise value. Allocated landed cost: $18.91 ($0.18906/g).",
+    "item_total_usd": 7.551518858307849,
+    "shipping_usd": 4.137818552497452,
+    "duties_usd": 7.217125382262997,
+    "allocated_shipping_duties_usd": 11.354943934760449,
+    "price_basis": "100 g",
+    "pricing_status": "actual receipt plus estimated duties"
+  },
+  {
+    "finish": "",
+    "color": "",
+    "particle_size_microns": "N/A — liquid",
+    "solvent_safe": null,
+    "volume_ml": null,
+    "unit_count": null,
+    "unit_name": "",
+    "order_id": "",
+    "order_date": "",
+    "location": "",
+    "image_url": "",
+    "msds_url": "",
+    "coa_url": "",
+    "verification_status": "verified",
+    "discontinued": null,
+    "moq_g": null,
+    "stain_test_result": "untested",
+    "stain_test_notes": "",
+    "do_not_use": false,
+    "use_restriction": "",
+    "fees_usd": 0,
+    "id": "ALZO-DERMOL-DPG2B-1000G",
+    "name": "Dermol DPG-2B",
+    "vendor": "Alzo International",
+    "category": "Raw Material",
+    "weight_g": 1000,
+    "price_usd": 25.0,
+    "la_safe": true,
+    "notes": "Alzo is providing a 1 kg production pack at no product charge. Provisional landed cost is $25.00 for estimated UPS shipping only, or $0.02500/g. Replace this estimate when the actual UPS charge is known.",
+    "item_total_usd": 0,
+    "shipping_usd": 25.0,
+    "duties_usd": 0,
+    "allocated_shipping_duties_usd": 25.0,
+    "price_basis": "1 kg free sample / production pack",
+    "pricing_status": "estimated UPS shipping"
+  },
+  {
+    "finish": "",
+    "color": "",
+    "particle_size_microns": "N/A — liquid",
+    "solvent_safe": null,
+    "volume_ml": null,
+    "unit_count": null,
+    "unit_name": "",
+    "order_id": "",
+    "order_date": "",
+    "location": "",
+    "image_url": "",
+    "msds_url": "",
+    "coa_url": "",
+    "verification_status": "verified",
+    "discontinued": null,
+    "moq_g": null,
+    "stain_test_result": "untested",
+    "stain_test_notes": "",
+    "do_not_use": false,
+    "use_restriction": "",
+    "fees_usd": 0.71,
+    "id": "LOTIONCRAFTER-PE9010-2OZ",
+    "name": "Lotioncrafter PE 9010",
+    "vendor": "Lotioncrafter",
+    "category": "Preservative",
+    "weight_g": 56.69904625,
+    "price_usd": 12.51,
+    "la_safe": true,
+    "notes": "2 oz purchase. Product $5.95, shipping $5.85, Pennsylvania sales tax $0.71; landed total $12.51. For formula costing, 2 oz is treated as 56.699 g, or about $0.22064/g.",
+    "item_total_usd": 5.95,
+    "shipping_usd": 5.85,
+    "duties_usd": 0,
+    "allocated_shipping_duties_usd": 6.56,
+    "price_basis": "2 oz",
+    "pricing_status": "actual receipt"
+  }
+];
+// normalize: auto-apply HALF_OZ_G if weight missing and name/notes mention 1/2 oz
+for (var i=0;i<window.__INV__.length;i++){
+  var it = window.__INV__[i];
+  var notes = (it.notes||'').toLowerCase();
+  var name = (it.name||'').toLowerCase();
+  if ((it.weight_g==null || it.weight_g===0) && (notes.includes('1/2 oz') || name.includes('1/2 oz') || name.includes('1/2 ounce'))) {
+    it.weight_g = HALF_OZ_G;
+  }
+}
+
+// cleanup: trim strings and normalize empty values
+function cleanStr(x){
+  if(x===null||typeof x==="undefined") return x;
+  var s=String(x).replace(/\s+/g," ").trim();
+  return s===""?null:s;
+}
+for (var j=0;j<window.__INV__.length;j++){
+  var x = window.__INV__[j];
+  if(!x) continue;
+  x.id = cleanStr(x.id);
+  x.name = cleanStr(x.name);
+  x.vendor = cleanStr(x.vendor);
+  x.category = cleanStr(x.category);
+  x.finish = cleanStr(x.finish);
+  x.color = cleanStr(x.color);
+  x.particle_size_microns = cleanStr(x.particle_size_microns);
+  x.order_id = cleanStr(x.order_id);
+  x.order_date = cleanStr(x.order_date);
+  x.location = cleanStr(x.location);
+  x.notes = cleanStr(x.notes);
+  x.image_url = cleanStr(x.image_url);
+  x.verification_status = cleanStr(x.verification_status);
+  x.staining_risk = cleanStr(x.staining_risk);
+}
+function $(s){return document.querySelector(s)}
+function fmtUSD(n){return isFinite(n)?"$"+n.toFixed(2):"—"}
+function num(v){return(v===null||v===""||typeof v==="undefined")?null:Number(v)}
+function cpg(it){var p=num(it.price_usd),g=num(it.weight_g);return(p!==null&&g)?p/g:null}
+function cpml(it){var p=num(it.price_usd), v=num(it.volume_ml);return (p!==null && v) ? p/v : null;}
+function cpunit(it){var p=num(it.price_usd), u=num(it.unit_count);return (p!==null && u) ? p/u : null;}
+function fmtRate(n){if(!isFinite(n)) return "—"; if(n<0.01) return "$"+n.toFixed(5); if(n<1) return "$"+n.toFixed(4); return "$"+n.toFixed(2);}
+var DB = Array.isArray(window.__INV__)?window.__INV__:[];
+
+// Rule: only VERIFIED items can be marked LA Safe
+DB.forEach(function(item){
+  if(item && item.verification_status !== "verified" && item.la_safe===true) item.la_safe = false;
+});
+
+function uniq(a){var m={},o=[];for(var i=0;i<a.length;i++){var k=String(a[i]||"");if(k&&!m[k]){m[k]=1;o.push(k)}}o.sort(function(a,b){return String(a).localeCompare(String(b))});return o}
+function populate(){
+  var v = uniq(DB.map(function(x){return x.vendor}).filter(Boolean));
+  var c = uniq(DB.map(function(x){return x.category}).filter(Boolean));
+  var f = uniq(DB.map(function(x){return x.finish}).filter(Boolean));
+  var clr = uniq(DB.map(function(x){return x.color}).filter(Boolean));
+  $("#vendor").innerHTML   = '<option value="">All vendors</option>'   + v.map(function(x){return '<option>'+x+'</option>'}).join('');
+  $("#category").innerHTML = '<option value="">All categories</option>' + c.map(function(x){return '<option>'+x+'</option>'}).join('');
+  $("#finish").innerHTML   = '<option value="">All finishes</option>'  + f.map(function(x){return '<option>'+x+'</option>'}).join('');
+  $("#color").innerHTML    = '<option value="">All colors</option>'    + clr.map(function(x){return '<option>'+x+'</option>'}).join('');
+}
+var state={q:"",vendor:"",category:"",finish:"",color:"",la_safe:"",stain_test:"",use_status:"",sort:"vendor_name"};
+function filterDB(){
+  var q=(state.q||"").toLowerCase();
+  var rows = DB.filter(function(it){
+    var hay=[it.name,it.vendor,it.category,it.finish,it.color,it.particle_size_microns,it.order_id,it.notes,it.stain_test_result,it.stain_test_notes,it.use_restriction].join(" ").toLowerCase();
+    var matchQ = !q || hay.indexOf(q)!==-1;
+    var mv = !state.vendor || it.vendor===state.vendor;
+    var mc = !state.category || it.category===state.category;
+    var mf = !state.finish || it.finish===state.finish;
+    var mclr = !state.color || (it.color && it.color.toLowerCase().indexOf(state.color.toLowerCase())!==-1);
+    var msafe = !state.la_safe ||
+      (state.la_safe==='safe' && it.la_safe===true) ||
+      (state.la_safe==='unsafe' && it.la_safe===false);
+    var mstain = !state.stain_test || it.stain_test_result===state.stain_test;
+    var muse = !state.use_status ||
+      (state.use_status==='usable' && it.do_not_use!==true) ||
+      (state.use_status==='do_not_use' && it.do_not_use===true);
+    return matchQ && mv && mc && mf && mclr && msafe && mstain && muse;
+  });
+  rows.sort(function(a,b){
+    function cmp(x,y){return String(x||"").localeCompare(String(y||""), undefined, {sensitivity:"base"});}
+    if(state.sort==='vendor_name'){
+      var v = cmp(a.vendor,b.vendor); if(v) return v;
+      return cmp(a.name,b.name);
+    }
+    if(state.sort==='name')        return cmp(a.name,b.name);
+    if(state.sort==='cpgram_asc')  return (cpg(a)||Infinity)-(cpg(b)||Infinity);
+    if(state.sort==='cpgram_desc') return (cpg(b)||-Infinity)-(cpg(a)||-Infinity);
+    if(state.sort==='cpunit_asc') return (cpunit(a)||Infinity)-(cpunit(b)||Infinity);
+    if(state.sort==='cpunit_desc') return (cpunit(b)||-Infinity)-(cpunit(a)||-Infinity);
+    if(state.sort==='date_desc')   return String(b.order_date||"").localeCompare(String(a.order_date||"")); 
+    if(state.sort==='date_asc')    return String(a.order_date||"").localeCompare(String(b.order_date||"")); 
+    return 0;
+  });
+  return rows;
+}
+function totals(rows){
+  var spend=0, wt=0, sum=0, cnt=0, blocked=0, countBased=0;
+  for(var i=0;i<rows.length;i++){
+    spend += num(rows[i].price_usd)||0;
+    wt += num(rows[i].weight_g)||0;
+    if(rows[i].do_not_use===true) blocked++;
+    if(num(rows[i].unit_count)) countBased++;
+    var x=cpg(rows[i]); if(x!==null){sum+=x;cnt++;}
+  }
+  return {spend:spend,wt:wt,avg:cnt?sum/cnt:0,blocked:blocked,countBased:countBased};
+}
+function render(){
+  var data=filterDB();
+  $("#count").textContent=data.length+" item"+(data.length!==1?'s':'');
+  var t=totals(data);
+  $("#kpi_total_items").textContent="Total items: "+data.length;
+  $("#kpi_total_cost").textContent="Total spend: "+fmtUSD(t.spend);
+  $("#kpi_total_weight").textContent="Total weight: "+t.wt.toFixed(2)+" g";
+  $("#kpi_avg_cpg").textContent="Avg $/g: "+(isFinite(t.avg)?"$"+t.avg.toFixed(2):"—");
+  $("#kpi_count_based").textContent="Count-based items: "+t.countBased;
+  $("#kpi_do_not_use").textContent="Do not use: "+t.blocked;
+  var grid=$("#grid"); 
+  grid.innerHTML="";
+  if(!data.length){
+    var d=document.createElement('div');
+    d.className='meta';
+    d.textContent='No items match your filters.';
+    grid.appendChild(d);
+    return;
+  }
+  var currentVendor=null;
+  for(var i=0;i<data.length;i++){
+    var it=data[i];
+    // Insert vendor header rows when using grouped vendor sort
+    if(state.sort==='vendor_name'){
+      var vName = it.vendor || 'Unknown vendor';
+      if(vName !== currentVendor){
+        currentVendor = vName;
+        // count items in this vendor (contiguous because of sort)
+        var cnt=0;
+        for(var k=i;k<data.length;k++){ if((data[k].vendor||'Unknown vendor')===vName) cnt++; else break; }
+        var gh=document.createElement('div');
+        gh.className='group-header';
+        gh.innerHTML = '<span class="vendor">'+vName+'</span><span class="count">(' + cnt + ')</span>';
+        grid.appendChild(gh);
+      }
+    }
+    var card=document.createElement('article'); 
+    card.className='card';
+    if(it.discontinued===true){ card.classList.add('discontinued'); }
+    if(it.do_not_use===true){ card.classList.add('do-not-use'); }
+    var imgwrap=document.createElement('div'); 
+    imgwrap.className='imgwrap';
+    if(it.image_url){
+      var img=document.createElement('img'); 
+      img.src=it.image_url; 
+      img.alt=it.name||''; 
+      imgwrap.appendChild(img);
+    } else {
+      imgwrap.textContent='no image';
+    }
+    // use restriction flag (top-left)
+    if(it.do_not_use===true){
+      var block=document.createElement('div');
+      block.className='flag use-blocked';
+      block.textContent='DO NOT USE';
+      imgwrap.appendChild(block);
+    }
+    var body=document.createElement('div'); 
+    body.className='card-body';
+    var name=document.createElement('h3'); 
+    name.className='name'; 
+    name.textContent=it.name||'(Unnamed)';
+    var meta=document.createElement('div'); 
+    meta.className='meta';
+    var vendorText = it.vendor || 'Unknown';
+    var categoryText = it.category || '';
+    var finishText = it.finish ? (' • '+it.finish) : '';
+    meta.textContent = vendorText + ' • ' + categoryText + finishText;
+    var chips=document.createElement('div'); 
+    chips.className='chips';
+    function chip(txt,cls){
+      var s=document.createElement('span'); 
+      s.className='chip'+(cls?(' '+cls):''); 
+      s.textContent=txt; 
+      chips.appendChild(s);
+    }
+    if(it.do_not_use===true) chip('DO NOT USE','no-use');
+    if(it.color) chip(it.color);
+    if(it.particle_size_microns) chip(String(it.particle_size_microns));
+    if(it.solvent_safe===true) chip('Solvent-safe');
+    if(it.discontinued===true) chip('Discontinued','discontinued');
+    if(it.la_safe===true) chip('LA Safe','la-safe');
+    else if(it.la_safe===false) chip('Not LA Safe','la-unsafe');
+    if(it.verification_status==='unverified') chip('Unverified','unverified');
+    if(it.stain_test_result==='passed') chip('Stain test: pass','stain-pass');
+    else if(it.stain_test_result==='failed') chip('Stain test: FAIL','stain-fail');
+    else if(it.stain_test_result==='caution') chip('Stain test: use caution','stain-caution');
+    else if(it.stain_test_result==='needs_retest') chip('Stain retest needed','stain-retest');
+    var price=document.createElement('div'); 
+    price.className='price';
+    var c=cpg(it), parts=[];
+    if(it.weight_g) parts.push(String(Number(it.weight_g).toFixed(it.weight_g<1000?2:0))+' g');
+    if(it.volume_ml) parts.push(String(Number(it.volume_ml).toFixed(2))+' ml');
+    if(it.unit_count) parts.push(Number(it.unit_count).toLocaleString()+' '+(it.unit_name||'units'));
+    parts.push('Landed '+(it.price_usd!=null?fmtUSD(Number(it.price_usd)):'—'));
+    if(c!=null) parts.push(fmtRate(c)+"/g");
+    var m=cpml(it);
+    if(it.volume_ml && m!=null) parts.push(fmtRate(m)+"/ml");
+    var u=cpunit(it);
+    if(it.unit_count && u!=null) parts.push(fmtRate(u)+"/"+(it.unit_name?it.unit_name.replace(/s$/,''):'unit'));
+    price.innerHTML=parts.join(' · ');
+    if (it.moq_g) {
+      var moqLine = document.createElement('div');
+      moqLine.className = 'meta';
+      moqLine.textContent = "MOQ: " + it.moq_g + " g";
+      body.appendChild(moqLine);
+    }
+    body.appendChild(name); 
+    body.appendChild(meta); 
+    body.appendChild(chips);
+    if(it.do_not_use===true || it.stain_test_notes){
+      var note=document.createElement('div');
+      note.className='note-line' + (it.do_not_use===true ? ' danger' : '');
+      note.textContent=it.stain_test_notes || it.use_restriction || '';
+      body.appendChild(note);
+    }
+
+    // SDS/MSDS + COA doc chips (always visible; disabled if missing)
+    var docs=document.createElement('div');
+    docs.className='docs';
+    function docChip(label,url){
+      if(url){
+        var a=document.createElement('a');
+        a.className='docchip';
+        a.href=url;
+        a.target='_blank';
+        a.rel='noopener';
+        a.textContent=label;
+        return a;
+      }
+      var s=document.createElement('span');
+      s.className='docchip disabled';
+      s.textContent=label;
+      return s;
+    }
+    var sdsUrl = it.msds_url || it.sds_url || '';
+    var coaUrl = it.coa_url || '';
+    docs.appendChild(docChip('SDS/MSDS', sdsUrl));
+    docs.appendChild(docChip('COA', coaUrl));
+    body.appendChild(docs);
+
+    var productCost=num(it.item_total_usd), shippingCost=num(it.shipping_usd), feeCost=num(it.fees_usd), dutyCost=num(it.duties_usd);
+    var allocatedCost=num(it.allocated_shipping_duties_usd);
+    if(productCost!==null || shippingCost || feeCost || dutyCost || allocatedCost){
+      var breakdown=document.createElement('div');
+      breakdown.className='meta';
+      breakdown.style.marginTop='8px';
+      var bp=[];
+      if(productCost!==null) bp.push('Product '+fmtUSD(productCost));
+      if(shippingCost) bp.push('Shipping '+fmtUSD(shippingCost));
+      if(feeCost) bp.push('Fees '+fmtUSD(feeCost));
+      if(dutyCost) bp.push('Duty '+fmtUSD(dutyCost));
+      if(!shippingCost && !feeCost && !dutyCost && allocatedCost) bp.push('Allocated freight/duties '+fmtUSD(allocatedCost));
+      breakdown.textContent=bp.join(' · ');
+      body.appendChild(breakdown);
+    }
+    if(it.price_basis){
+      var basis=document.createElement('div');
+      basis.className='meta';
+      basis.textContent='Price basis: '+it.price_basis;
+      body.appendChild(basis);
+    }
+ 
+    body.appendChild(price);
+    card.appendChild(imgwrap); 
+    card.appendChild(body); 
+    grid.appendChild(card);
+  }
+}
+function clearFilters(){
+  state={q:"",vendor:"",category:"",finish:"",color:"",la_safe:"",stain_test:"",use_status:"",sort:"vendor_name"};
+  $("#q").value=""; 
+  $("#vendor").value=""; 
+  $("#category").value=""; 
+  $("#finish").value=""; 
+  $("#color").value=""; 
+  $("#la_safe").value=""; 
+  $("#stain_test").value="";
+  $("#use_status").value="";
+  $("#sort").value="vendor_name";
+  render();
+}
+function init(){
+  populate();
+  $("#sort").value = state.sort;
+  $("#q").addEventListener('input', function(e){state.q=e.target.value; render();});
+  $("#vendor").addEventListener('change', function(e){state.vendor=e.target.value; render();});
+  $("#category").addEventListener('change', function(e){state.category=e.target.value; render();});
+  $("#finish").addEventListener('change', function(e){state.finish=e.target.value; render();});
+  $("#color").addEventListener('change', function(e){state.color=e.target.value; render();});
+  $("#la_safe").addEventListener('change', function(e){state.la_safe=e.target.value; render();});
+  $("#stain_test").addEventListener('change', function(e){state.stain_test=e.target.value; render();});
+  $("#use_status").addEventListener('change', function(e){state.use_status=e.target.value; render();});
+  $("#sort").addEventListener('change', function(e){state.sort=e.target.value; render();});
+  $("#clear").addEventListener('click', clearFilters);
+  render();
+}
+init();
+// Back to top button logic
+document.addEventListener("DOMContentLoaded", function() {
+  const btn = document.getElementById("toTop");
+  if (!btn) return;
+
+  window.addEventListener("scroll", function() {
+    if (document.body.scrollTop > 200 || document.documentElement.scrollTop > 200) {
+      btn.style.display = "block";
+    } else {
+      btn.style.display = "none";
+    }
+  });
+
+  btn.addEventListener("click", function() {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  });
+});
+</script>
+<button id="toTop" title="Go to top">↑ Top</button>
+</body>
+</html>
